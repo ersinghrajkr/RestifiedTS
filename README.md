@@ -30,41 +30,6 @@ This document tracks the status of all features planned and implemented for the 
 
 ---
 
-## 🚀 High-Priority (Planned / Pending)
-
-| Feature                      | Module / Plan                         | Priority  | Status         |
-| ---------------------------- | ------------------------------------- | ----------|----------------|
-| @test() Decorator            | decorators/test.ts                    | ⭐ High    | ⏳ Upcoming     |
-| Tag-based filtering          | testRunner.ts (via Mocha args or CLI) | ⭐ High    | ⏳ Upcoming     |
-| Performance Metrics          | utils/PerformanceMetrics.ts           | ⭐ High    | ⏳ Upcoming     |
-| GraphQL Client               | utils/GraphQLClient.ts                | ⭐ High    | ✅ Implemented  |
-| WebSocket Client             | utils/WebSocketClient.ts              | ⭐ High    | ✅ Implemented  |
-| Mock Server                  | utils/MockServer.ts                   | ⭐ High    | ✅ Implemented  |
-| GPath-like JSON extractor    | utils/JsonExtractor.ts                | ⭐ Medium  | ⏳ Upcoming     |
-| File Upload                  | utils/FileUploader.ts                 | ⭐ Medium  | ⏳ Upcoming     |
-| Auth Providers               | utils/AuthProvider.ts                 | ⭐ Medium  | ⏳ Upcoming     |
-| XML Support                  | utils/XmlParser.ts                    | ⭐ Medium  | ⏳ Upcoming     |
-| SSL Config                   | utils/SslConfig.ts                    | ⭐ Medium  | ⏳ Upcoming     |
-| Proxy Manager                | utils/ProxyManager.ts                 | ⭐ Medium  | ⏳ Upcoming     |
-| Interceptor Manager          | utils/InterceptorManager.ts           | ⭐ Medium  | ⏳ Upcoming     |
-| Diff Dashboard (Snapshot UI) | cli/generateDiffDashboard.ts          | ⭐ Medium  | ⏳ Upcoming     |
-| Docker Support + CI          | Dockerfile, GitHub Actions            | ⭐ Medium  | ⏳ Upcoming     |
-
----
-
-## 🧠 Suggested Enhancements
-
-| Enhancement                 | Description                                 | Priority  | Status     |
-| --------------------------- | ------------------------------------------- | ----------|------------|
-| Swagger/OpenAPI Generator   | Convert OpenAPI spec to test templates      | ⭐ Medium  | ⏳ Planned |
-| Type-Safe GraphQL Generator | Build types from GraphQL schema             | ⭐ Medium  | ⏳ Planned |
-| Rate Limiting Simulator     | Simulate throttled/slow endpoints           | ⭐ Medium  | ⏳ Planned |
-| Plugin Architecture         | Add or remove modules like schema validator | ⭐ Medium  | ⏳ Planned |
-| Retry on Status Code        | Retry 5xx, 429, etc. with delay + backoff   | ⭐ Medium  | ⏳ Planned |
-| HTML Dashboard for Diffing  | Visual HTML snapshot comparison dashboard   | ⭐ Medium  | ⏳ Planned |
-
-
-
 ### ❗ Missing or To-Do Features
 
 | Feature                              | Needed In                                            | Priority  | Status        |
@@ -98,23 +63,16 @@ This document tracks the status of all features planned and implemented for the 
 | Type-safe GraphQL    | Auto-generate types from GraphQL schema                        | ⏳ Planned     |
 | HTML Dashboard       | Beautiful diff-dashboard.html for visual diffs (built in CLI) | ⏳ Planned     |
 | Test Retry on Status Code | Retry if 5xx or 429                                       | ⏳ Planned     |
-
+| Swagger/OpenAPI Generator   | Convert OpenAPI spec to test templates      | ⭐ Medium  | ⏳ Planned |
+| Type-Safe GraphQL Generator | Build types from GraphQL schema             | ⭐ Medium  | ⏳ Planned |
+| Rate Limiting Simulator     | Simulate throttled/slow endpoints           | ⭐ Medium  | ⏳ Planned |
+| Plugin Architecture         | Add or remove modules like schema validator | ⭐ Medium  | ⏳ Planned |
+| Retry on Status Code        | Retry 5xx, 429, etc. with delay + backoff   | ⭐ Medium  | ⏳ Planned |
+| HTML Dashboard for Diffing  | Visual HTML snapshot comparison dashboard   | ⭐ Medium  | ⏳ Planned |
 ---
 
-### 📌 Final Framework TODO Plan (Next Milestones)
+| --------------------------- | ------------------------------------------- | ----------|------------|
 
-| Priority | Task                                                   | Status        |
-|----------|--------------------------------------------------------|----------------|
-| 🔥       | Build FluentDSL.ts with given().when().then()          | ✅ Done        |
-| 🔥       | Build WebSocketClient.ts                                | ✅ Done        |
-| 🔥       | Build GraphQLClient.ts                                  | ✅ Done        |
-| 🔥       | Build MockServer.ts (contract mocking)                  | ✅ Done        |
-| 🔥       | Add @test() decorator system + tag filtering            | ⏳ Upcoming    |
-| 🔥       | Create PerformanceMetrics.ts for SLA assertion          | ⏳ Upcoming    |
-| ⚙️        | Add XmlParser.ts, JsonExtractor.ts                     | ⏳ Upcoming    |
-| 💡       | Add plugin for Swagger-to-test auto generator           | ⏳ Upcoming    |
-| 🚀       | Add Docker-ready GitHub Actions CI with reporters       | ⏳ Upcoming    |
-| 📊       | Add generateDiffDashboard.ts with HTML diff UI          | ⏳ Upcoming    |
 
 
 
