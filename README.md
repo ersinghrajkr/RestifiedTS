@@ -73,7 +73,28 @@ This document tracks the status of all features planned and implemented for the 
 
 | --------------------------- | ------------------------------------------- | ----------|------------|
 
+## 🧩 Folder Structure Summary
 
+```
+RestifiedTS/
+├── src/
+│   ├── core/             → HTTPClient, FluentDSL, ContextManager, ResponseStore
+│   ├── utils/            → Builder, Logger, Validators, GraphQL, WebSockets, etc.
+│   ├── cli/              → Commands to scaffold tests, generate diff dashboards
+│   └── types/            → Custom TypeScript definitions
+│
+├── tests/
+│   ├── integration/      → Test suites per client/feature
+│   └── fixtures/         → Reusable payloads and test assets
+│
+├── config/              → dev.json, staging.json, prod.json
+├── reports/             → mochawesome and snapshot outputs
+├── logs/                → audit log files
+├── .mocharc.ts          → Mocha config with ts-node
+├── package.json         → Scripts and dependency metadata
+├── tsconfig.json        → TypeScript config
+└── README.md            → How to use and contribute
+```
 
 
 
