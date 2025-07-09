@@ -1,15 +1,69 @@
 # RestifiedTS
 REST API Automation Framework - RestifiedTS
 
-from pathlib import Path
-
-# Define the markdown content
 
 ## ✅ RestifiedTS Feature Implementation Tracker (2025)
 
 This document tracks the status of all features planned and implemented for the RestifiedTS framework.
 
+## ✅ Implemented Core Features
+
+| ✅ Feature                         | Location / Module          | Priority  | Description                                               |
+| ---------------------------------- | -------------------------- | ----------|-----------------------------------------------------------|
+| FluentDSL.ts                       | src/core/FluentDSL.ts      | ⭐ High    | Fluent chaining like RestAssured – given().when().then() |
+| Multi-instance HTTP Client         | src/core/ContextManager.ts | ⭐ High    | Manage multiple API clients for different services        |
+| Response Store                     | src/core/ResponseStore.ts  | ⭐ High    | Save and reuse responses across test chains               |
+| PayloadBuilder                     | utils/PayloadBuilder.ts    | ⭐ High    | Dynamic JSON payloads using faker and placeholder support |
+| Global/Local Variable Store        | utils/VariableStore.ts     | ⭐ High    | Scoped variables for chaining or test re-use              |
+| Audit Logger                       | utils/AuditLogger.ts       | ⭐ Medium  | Logs request & response to file                           |
+| Deep Assertions                    | utils/AssertionUtils.ts    | ⭐ High    | Custom chai-based deep comparison utilities               |
+| Retry Support                      | src/core/HTTPClient.ts     | ⭐ High    | Auto-retry logic for network failures                     |
+| Global Configuration               | config/*.json              | ⭐ High    | Per-env config (dev, staging, prod)                       |
+| Test Examples (Multiple Instances) | tests/integration          | ⭐ High    | Usage of multi-client tests with chaining & overrides     |
+| Wait / Sleep                       | utils/WaitUtil.ts          | ⭐ Medium  | waitFor(ms) utility for async flows                       |
+| JSON Placeholder Resolution        | utils/PayloadBuilder.ts    | ⭐ High    | Use {{varName}} or {{faker.name.firstName}} in payloads   |
+| Response Snapshot Testing          | utils/ResponseSnapshot.ts  | ⭐ Medium  | Compare new responses against saved snapshots             |
+| HTML Reporter (Lightweight)        | mochawesome integrated     | ⭐ Medium  | Clear report with step logs & results                     |
+| Tag-Based Skipping (Soon)          | decorators/test.ts         | ⭐ High    | BDD tagging like @smoke, @regression                      |
+| Mocha Test Hooks                   | .mocharc.ts                | ⭐ Medium  | beforeAll, afterAll, beforeEach, afterEach hooks          |
+| Unique Response Storage            | ResponseStore              | ⭐ High    | Store responses with custom keys without overwriting      |
+
 ---
+
+## 🚀 High-Priority (Planned / Pending)
+
+| Feature                      | Module / Plan                         | Priority  | Status         |
+| ---------------------------- | ------------------------------------- | ----------|----------------|
+| @test() Decorator            | decorators/test.ts                    | ⭐ High    | ⏳ Upcoming     |
+| Tag-based filtering          | testRunner.ts (via Mocha args or CLI) | ⭐ High    | ⏳ Upcoming     |
+| Performance Metrics          | utils/PerformanceMetrics.ts           | ⭐ High    | ⏳ Upcoming     |
+| GraphQL Client               | utils/GraphQLClient.ts                | ⭐ High    | ✅ Implemented  |
+| WebSocket Client             | utils/WebSocketClient.ts              | ⭐ High    | ✅ Implemented  |
+| Mock Server                  | utils/MockServer.ts                   | ⭐ High    | ✅ Implemented  |
+| GPath-like JSON extractor    | utils/JsonExtractor.ts                | ⭐ Medium  | ⏳ Upcoming     |
+| File Upload                  | utils/FileUploader.ts                 | ⭐ Medium  | ⏳ Upcoming     |
+| Auth Providers               | utils/AuthProvider.ts                 | ⭐ Medium  | ⏳ Upcoming     |
+| XML Support                  | utils/XmlParser.ts                    | ⭐ Medium  | ⏳ Upcoming     |
+| SSL Config                   | utils/SslConfig.ts                    | ⭐ Medium  | ⏳ Upcoming     |
+| Proxy Manager                | utils/ProxyManager.ts                 | ⭐ Medium  | ⏳ Upcoming     |
+| Interceptor Manager          | utils/InterceptorManager.ts           | ⭐ Medium  | ⏳ Upcoming     |
+| Diff Dashboard (Snapshot UI) | cli/generateDiffDashboard.ts          | ⭐ Medium  | ⏳ Upcoming     |
+| Docker Support + CI          | Dockerfile, GitHub Actions            | ⭐ Medium  | ⏳ Upcoming     |
+
+---
+
+## 🧠 Suggested Enhancements
+
+| Enhancement                 | Description                                 | Priority  | Status     |
+| --------------------------- | ------------------------------------------- | ----------|------------|
+| Swagger/OpenAPI Generator   | Convert OpenAPI spec to test templates      | ⭐ Medium  | ⏳ Planned |
+| Type-Safe GraphQL Generator | Build types from GraphQL schema             | ⭐ Medium  | ⏳ Planned |
+| Rate Limiting Simulator     | Simulate throttled/slow endpoints           | ⭐ Medium  | ⏳ Planned |
+| Plugin Architecture         | Add or remove modules like schema validator | ⭐ Medium  | ⏳ Planned |
+| Retry on Status Code        | Retry 5xx, 429, etc. with delay + backoff   | ⭐ Medium  | ⏳ Planned |
+| HTML Dashboard for Diffing  | Visual HTML snapshot comparison dashboard   | ⭐ Medium  | ⏳ Planned |
+
+
 
 ### ❗ Missing or To-Do Features
 
