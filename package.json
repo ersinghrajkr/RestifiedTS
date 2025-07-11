@@ -1,0 +1,26 @@
+{
+  "name": "restifiedts",
+  "version": "1.0.0",
+  "description": "RestifiedTS is a powerful, lightweight, and fully extensible API automation framework built in TypeScript, designed as a battle-ready alternative to Java’s RestAssured — but with modern capabilities tailored for JavaScript/Node.js ecosystems.",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ersinghrajkr/RestifiedTS.git"
+  },
+  "keywords": [
+    "Raj",
+    "Kumar"
+  ],
+  "author": "Raj Kumar",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/ersinghrajkr/RestifiedTS/issues"
+  },
+  "homepage": "https://github.com/ersinghrajkr/RestifiedTS#readme"
+}
