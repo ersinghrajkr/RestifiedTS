@@ -2,7 +2,7 @@
   "name": "restifiedts",
   "version": "1.0.0",
   "description": "RestifiedTS is a powerful, lightweight, and fully extensible API automation framework built in TypeScript, designed as a battle-ready alternative to Java’s RestAssured — but with modern capabilities tailored for JavaScript/Node.js ecosystems.",
-"main": "dist/index.js",
+  "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
     "restifiedts": "dist/cli/index.js"
@@ -11,7 +11,7 @@
     "test": "tests"
   },
   "scripts": {
-     "build": "tsc && tsc-alias",
+    "build": "tsc && tsc-alias",
     "build:watch": "tsc --watch",
     "dev": "ts-node -r tsconfig-paths/register src/index.ts",
     "test": "mocha -r ts-node/register -r tsconfig-paths/register 'tests/**/*.test.ts'",
@@ -44,5 +44,8 @@
   "bugs": {
     "url": "https://github.com/ersinghrajkr/RestifiedTS/issues"
   },
-  "homepage": "https://github.com/ersinghrajkr/RestifiedTS#readme"
+  "homepage": "https://github.com/ersinghrajkr/RestifiedTS#readme",
+  "devDependencies": {
+    "@types/node": "^24.0.13"
+  }
 }

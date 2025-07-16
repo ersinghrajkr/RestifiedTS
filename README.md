@@ -1,7 +1,5 @@
 # 🚀 RestifiedTS – A Modern API Automation Framework in TypeScript
 
-# RestifiedTS - Production-Grade API Testing Framework
-
 ## 🎯 Overview
 
 RestifiedTS is a modern, TypeScript-first API testing framework inspired by Java's RestAssured, designed with production-grade quality, comprehensive error handling, and extensive functionality.
@@ -584,7 +582,7 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: '18'
-    
+  
       - name: Install dependencies
         run: npm ci
   
@@ -593,7 +591,7 @@ jobs:
         env:
           RESTIFIED_BASE_URL: ${{ secrets.API_BASE_URL }}
           RESTIFIED_AUTH_TOKEN: ${{ secrets.API_TOKEN }}
-    
+  
       - name: Upload Test Reports
         uses: actions/upload-artifact@v3
         if: always()
