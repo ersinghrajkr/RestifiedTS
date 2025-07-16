@@ -2,12 +2,34 @@
   "name": "restifiedts",
   "version": "1.0.0",
   "description": "RestifiedTS is a powerful, lightweight, and fully extensible API automation framework built in TypeScript, designed as a battle-ready alternative to Java’s RestAssured — but with modern capabilities tailored for JavaScript/Node.js ecosystems.",
-  "main": "index.js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "restifiedts": "dist/cli/index.js"
+  },
   "directories": {
     "test": "tests"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "tsc && tsc-alias",
+    "build:watch": "tsc --watch",
+    "dev": "ts-node -r tsconfig-paths/register src/index.ts",
+    "test": "mocha -r ts-node/register -r tsconfig-paths/register 'tests/**/*.test.ts'",
+    "test:unit": "mocha -r ts-node/register -r tsconfig-paths/register 'tests/unit/**/*.test.ts'",
+    "test:integration": "mocha -r ts-node/register -r tsconfig-paths/register 'tests/integration/**/*.test.ts'",
+    "test:smoke": "mocha -r ts-node/register -r tsconfig-paths/register --grep '@smoke' 'tests/**/*.test.ts'",
+    "test:regression": "mocha -r ts-node/register -r tsconfig-paths/register --grep '@regression' 'tests/**/*.test.ts'",
+    "test:coverage": "nyc npm run test",
+    "lint": "eslint src/**/*.ts tests/**/*.ts",
+    "lint:fix": "eslint src/**/*.ts tests/**/*.ts --fix",
+    "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
+    "clean": "rimraf dist",
+    "prepublishOnly": "npm run clean && npm run build",
+    "docs:generate": "typedoc --out docs src/index.ts",
+    "report:html": "mochawesome-merge reports/mochawesome-*.json | mochawesome-report-generator --inline",
+    "cli": "node dist/cli/index.js",
+    "generate-test": "node dist/cli/index.js generate",
+    "mock-server": "json-server --watch tests/fixtures/mock-data.json --port 3001"
   },
   "repository": {
     "type": "git",
@@ -22,5 +44,8 @@
   "bugs": {
     "url": "https://github.com/ersinghrajkr/RestifiedTS/issues"
   },
-  "homepage": "https://github.com/ersinghrajkr/RestifiedTS#readme"
+  "homepage": "https://github.com/ersinghrajkr/RestifiedTS#readme",
+  "devDependencies": {
+    "@types/node": "^24.0.13"
+  }
 }
