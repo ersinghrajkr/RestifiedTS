@@ -1,0 +1,76 @@
+{
+  "environment": "staging",
+  "services": {
+    "userService": {
+      "baseURL": "https://user-service.staging.example.com",
+      "timeout": 8000,
+      "retries": 3,
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Environment": "staging"
+      }
+    },
+    "paymentService": {
+      "baseURL": "https://payment-service.staging.example.com",
+      "timeout": 12000,
+      "retries": 4,
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Environment": "staging"
+      }
+    },
+    "notificationService": {
+      "baseURL": "https://notification-service.staging.example.com",
+      "timeout": 5000,
+      "retries": 2,
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Environment": "staging"
+      }
+    },
+    "orderService": {
+      "baseURL": "https://order-service.staging.example.com",
+      "timeout": 10000,
+      "retries": 3,
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Environment": "staging"
+      }
+    }
+  },
+  "database": {
+    "host": "staging-db.example.com",
+    "port": 5432,
+    "database": "restified_staging",
+    "username": "staging_user",
+    "password": "${DB_PASSWORD}",
+    "ssl": true,
+    "pool": {
+      "min": 5,
+      "max": 20
+    }
+  },
+  "authentication": {
+    "jwt": {
+      "secret": "${JWT_SECRET}",
+      "expiresIn": "8h"
+    },
+    "oauth": {
+      "clientId": "${OAUTH_CLIENT_ID}",
+      "clientSecret": "${OAUTH_CLIENT_SECRET}",
+      "tokenUrl": "https://auth.staging.example.com/oauth/token"
+    }
+  },
+  "logging": {
+    "level": "info",
+    "format": "structured",
+    "includeRequestBody": false,
+    "includeResponseBody": false
+  },
+  "testing": {
+    "parallel": true,
+    "maxConcurrency": 10,
+    "timeout": 45000,
+    "retries": 2
+  }
+}

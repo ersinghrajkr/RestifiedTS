@@ -1,465 +1,193 @@
-// src/core/clients/GraphQLClient.ts
+/**
+ * GraphQL Client for RestifiedTS
+ * 
+ * This module provides GraphQL query and mutation execution capabilities
+ * with support for variables, introspection, and schema validation.
+ */
 
+import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
+import { GraphQLConfig, RestifiedResponse, RestifiedRequest, RestifiedError } from '../../types/RestifiedTypes';
 import { HttpClient } from './HttpClient';
-import { 
-  RestifiedConfig, 
-  RequestConfig, 
-  RestifiedResponse, 
-  GraphQLRequest 
-} from '../../types/RestifiedTypes';
 
 /**
- * Production-grade GraphQL client with comprehensive features
- * 
- * Features:
- * - Query, mutation, and subscription support
- * - Variable validation and type safety
- * - Query optimization and caching
- * - Error handling and parsing
- * - Schema introspection
- * - Query complexity analysis
- * - Automatic persisted queries
- * - Batching support
- * - Custom directives handling
- * 
- * @example
- * ```typescript
- * const graphqlClient = new GraphQLClient({
- *   baseURL: 'https://api.example.com/graphql',
- *   timeout: 10000
- * });
- * 
- * const response = await graphqlClient.query({
- *   query: `
- *     query GetUser($id: ID!) {
- *       user(id: $id) {
- *         id
- *         name
- *         email
- *       }
- *     }
- *   `,
- *   variables: { id: "123" }
- * });
- * ```
+ * GraphQL operation types
+ */
+export interface GraphQLOperation {
+  query: string;
+  variables?: Record<string, any>;
+  operationName?: string;
+}
+
+/**
+ * GraphQL response format
+ */
+export interface GraphQLResponse<T = any> {
+  data?: T;
+  errors?: Array<{
+    message: string;
+    locations?: Array<{ line: number; column: number }>;
+    path?: Array<string | number>;
+    extensions?: Record<string, any>;
+  }>;
+  extensions?: Record<string, any>;
+}
+
+/**
+ * GraphQL schema introspection types
+ */
+interface IntrospectionResult {
+  data?: {
+    __schema: {
+      types: Array<{
+        name: string;
+        kind: string;
+        description?: string;
+        fields?: Array<{
+          name: string;
+          type: any;
+          description?: string;
+        }>;
+      }>;
+      queryType: { name: string };
+      mutationType?: { name: string };
+      subscriptionType?: { name: string };
+    };
+  };
+  errors?: Array<{ message: string }>;
+}
+
+/**
+ * GraphQL client implementation
  */
 export class GraphQLClient {
   private httpClient: HttpClient;
-  private schema?: GraphQLSchema;
-  private queryCache: Map<string, CachedQuery> = new Map();
-  private readonly maxCacheSize: number = 100;
-  private persistedQueries: Map<string, string> = new Map();
+  private config: Required<GraphQLConfig>;
+  private schema?: IntrospectionResult;
 
-  constructor(config: RestifiedConfig) {
-    this.httpClient = new HttpClient(config);
+  constructor(config: GraphQLConfig, httpClient?: HttpClient) {
+    this.config = {
+      headers: {},
+      introspection: false,
+      defaultVariables: {},
+      ...config,
+      endpoint: config.endpoint || '/graphql'
+    };
+
+    this.httpClient = httpClient || new HttpClient({
+      baseURL: this.extractBaseURL(this.config.endpoint),
+      timeout: 30000
+    });
   }
 
   /**
    * Execute a GraphQL query
-   * 
-   * @param request - GraphQL query request
-   * @param options - Additional request options
-   * @returns Promise resolving to GraphQL response
    */
-  async query(
-    request: GraphQLRequest, 
-    options: GraphQLRequestOptions = {}
-  ): Promise<GraphQLResponse> {
-    this.validateRequest(request);
-    
-    const optimizedRequest = await this.optimizeQuery(request, options);
-    const httpRequest = this.buildHttpRequest(optimizedRequest, options);
-    
-    try {
-      const httpResponse = await this.httpClient.request(httpRequest);
-      return this.parseGraphQLResponse(httpResponse, request);
-    } catch (error) {
-      throw this.handleGraphQLError(error as Error, request);
+  async query<T = any>(
+    query: string, 
+    variables?: Record<string, any>,
+    options?: {
+      operationName?: string;
+      headers?: Record<string, string>;
+      timeout?: number;
     }
+  ): Promise<RestifiedResponse> {
+    return this.execute({
+      query,
+      variables: { ...this.config.defaultVariables, ...variables },
+      operationName: options?.operationName
+    }, options);
   }
 
   /**
    * Execute a GraphQL mutation
-   * 
-   * @param request - GraphQL mutation request
-   * @param options - Additional request options
-   * @returns Promise resolving to GraphQL response
    */
-  async mutate(
-    request: GraphQLRequest, 
-    options: GraphQLRequestOptions = {}
-  ): Promise<GraphQLResponse> {
-    // Mutations should not be cached
-    const mutationOptions = { ...options, useCache: false };
-    return this.query(request, mutationOptions);
-  }
-
-  /**
-   * Execute multiple GraphQL operations in a batch
-   * 
-   * @param requests - Array of GraphQL requests
-   * @param options - Additional request options
-   * @returns Promise resolving to array of GraphQL responses
-   */
-  async batch(
-    requests: GraphQLRequest[], 
-    options: GraphQLRequestOptions = {}
-  ): Promise<GraphQLResponse[]> {
-    if (requests.length === 0) {
-      return [];
-    }
-
-    if (requests.length === 1) {
-      return [await this.query(requests[0], options)];
-    }
-
-    const batchRequest = this.buildBatchRequest(requests);
-    const httpRequest = this.buildHttpRequest(batchRequest, options);
-    
-    try {
-      const httpResponse = await this.httpClient.request(httpRequest);
-      return this.parseBatchResponse(httpResponse, requests);
-    } catch (error) {
-      throw this.handleGraphQLError(error as Error, batchRequest);
-    }
-  }
-
-  /**
-   * Introspect GraphQL schema
-   * 
-   * @param forceRefresh - Whether to force schema refresh
-   * @returns Promise resolving to GraphQL schema
-   */
-  async introspectSchema(forceRefresh: boolean = false): Promise<GraphQLSchema> {
-    if (this.schema && !forceRefresh) {
-      return this.schema;
-    }
-
-    const introspectionQuery = this.getIntrospectionQuery();
-    const response = await this.query({
-      query: introspectionQuery,
-      operationName: 'IntrospectionQuery'
-    });
-
-    if (response.errors) {
-      throw new Error(`Schema introspection failed: ${JSON.stringify(response.errors)}`);
-    }
-
-    this.schema = this.parseSchemaFromIntrospection(response.data);
-    return this.schema;
-  }
-
-  /**
-   * Validate query against schema
-   * 
-   * @param request - GraphQL request to validate
-   * @returns Validation result
-   */
-  async validateQuery(request: GraphQLRequest): Promise<GraphQLValidationResult> {
-    if (!this.schema) {
-      await this.introspectSchema();
-    }
-
-    return this.performQueryValidation(request, this.schema!);
-  }
-
-  /**
-   * Analyze query complexity
-   * 
-   * @param request - GraphQL request to analyze
-   * @returns Query complexity analysis
-   */
-  async analyzeComplexity(request: GraphQLRequest): Promise<GraphQLComplexityAnalysis> {
-    const parser = new GraphQLQueryParser();
-    const parsed = parser.parse(request.query);
-    
-    return {
-      estimatedComplexity: this.calculateComplexity(parsed),
-      depthAnalysis: this.analyzeDepth(parsed),
-      fieldCount: this.countFields(parsed),
-      recommendations: this.generateOptimizationRecommendations(parsed)
-    };
-  }
-
-  /**
-   * Clear query cache
-   */
-  clearCache(): void {
-    this.queryCache.clear();
-  }
-
-  /**
-   * Get cache statistics
-   * 
-   * @returns Cache statistics
-   */
-  getCacheStats(): GraphQLCacheStats {
-    let totalHits = 0;
-    let totalMisses = 0;
-    
-    this.queryCache.forEach(cached => {
-      totalHits += cached.hits;
-      totalMisses += cached.misses;
-    });
-
-    return {
-      totalQueries: this.queryCache.size,
-      totalHits,
-      totalMisses,
-      hitRate: totalHits + totalMisses > 0 ? totalHits / (totalHits + totalMisses) : 0,
-      cacheSize: this.queryCache.size,
-      maxCacheSize: this.maxCacheSize
-    };
-  }
-
-  /**
-   * Register persisted query
-   * 
-   * @param queryId - Unique query identifier
-   * @param query - GraphQL query string
-   */
-  registerPersistedQuery(queryId: string, query: string): void {
-    this.persistedQueries.set(queryId, query);
-  }
-
-  /**
-   * Execute persisted query
-   * 
-   * @param queryId - Persisted query identifier
-   * @param variables - Query variables
-   * @param options - Additional request options
-   * @returns Promise resolving to GraphQL response
-   */
-  async executePersistedQuery(
-    queryId: string,
+  async mutation<T = any>(
+    mutation: string,
     variables?: Record<string, any>,
-    options: GraphQLRequestOptions = {}
-  ): Promise<GraphQLResponse> {
-    const query = this.persistedQueries.get(queryId);
-    if (!query) {
-      throw new Error(`Persisted query not found: ${queryId}`);
+    options?: {
+      operationName?: string;
+      headers?: Record<string, string>;
+      timeout?: number;
     }
-
-    return this.query({ query, variables }, options);
+  ): Promise<RestifiedResponse> {
+    return this.execute({
+      query: mutation,
+      variables: { ...this.config.defaultVariables, ...variables },
+      operationName: options?.operationName
+    }, options);
   }
 
-  // ==========================================
-  // PRIVATE METHODS
-  // ==========================================
-
-  private validateRequest(request: GraphQLRequest): void {
-    if (!request.query || typeof request.query !== 'string') {
-      throw new Error('GraphQL query is required and must be a string');
+  /**
+   * Execute a GraphQL subscription (returns initial response, actual subscription would need WebSocket)
+   */
+  async subscription<T = any>(
+    subscription: string,
+    variables?: Record<string, any>,
+    options?: {
+      operationName?: string;
+      headers?: Record<string, string>;
+      timeout?: number;
     }
-
-    if (request.query.trim() === '') {
-      throw new Error('GraphQL query cannot be empty');
-    }
-
-    if (request.variables && typeof request.variables !== 'object') {
-      throw new Error('GraphQL variables must be an object');
-    }
-
-    if (request.operationName && typeof request.operationName !== 'string') {
-      throw new Error('GraphQL operation name must be a string');
-    }
+  ): Promise<RestifiedResponse> {
+    console.warn('Subscription execution via HTTP - for real-time subscriptions use WebSocket');
+    return this.execute({
+      query: subscription,
+      variables: { ...this.config.defaultVariables, ...variables },
+      operationName: options?.operationName
+    }, options);
   }
 
-  private async optimizeQuery(
-    request: GraphQLRequest, 
-    options: GraphQLRequestOptions
-  ): Promise<GraphQLRequest> {
-    let optimized = { ...request };
-
-    // Check cache first
-    if (options.useCache !== false) {
-      const cacheKey = this.generateCacheKey(request);
-      const cached = this.queryCache.get(cacheKey);
-      
-      if (cached && !this.isCacheExpired(cached)) {
-        cached.hits++;
-        return cached.request;
-      } else if (cached) {
-        cached.misses++;
-      }
+  /**
+   * Execute a raw GraphQL operation
+   */
+  async execute(
+    operation: GraphQLOperation,
+    options?: {
+      headers?: Record<string, string>;
+      timeout?: number;
     }
-
-    // Optimize query string (remove unnecessary whitespace, etc.)
-    optimized.query = this.normalizeQuery(optimized.query);
-
-    // Apply query transformations if needed
-    if (options.transformQuery) {
-      optimized.query = options.transformQuery(optimized.query);
-    }
-
-    // Cache the optimized query
-    if (options.useCache !== false) {
-      this.cacheQuery(request, optimized);
-    }
-
-    return optimized;
-  }
-
-  private buildHttpRequest(
-    request: GraphQLRequest, 
-    options: GraphQLRequestOptions
-  ): RequestConfig {
-    const body: any = {
-      query: request.query
-    };
-
-    if (request.variables) {
-      body.variables = request.variables;
-    }
-
-    if (request.operationName) {
-      body.operationName = request.operationName;
-    }
-
-    return {
-      method: 'POST',
-      url: options.endpoint || '/',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        ...options.headers
-      },
-      data: body,
-      timeout: options.timeout
-    };
-  }
-
-  private parseGraphQLResponse(
-    httpResponse: RestifiedResponse, 
-    originalRequest: GraphQLRequest
-  ): GraphQLResponse {
-    if (httpResponse.status < 200 || httpResponse.status >= 300) {
-      throw new Error(`HTTP ${httpResponse.status}: ${httpResponse.statusText}`);
-    }
-
-    if (!httpResponse.data) {
-      throw new Error('Empty response from GraphQL server');
-    }
-
-    let parsedData: any;
+  ): Promise<RestifiedResponse> {
+    const startTime = Date.now();
+    
     try {
-      parsedData = typeof httpResponse.data === 'string' 
-        ? JSON.parse(httpResponse.data) 
-        : httpResponse.data;
-    } catch (error) {
-      throw new Error(`Invalid JSON response: ${(error as Error).message}`);
-    }
-
-    // Validate GraphQL response structure
-    if (typeof parsedData !== 'object') {
-      throw new Error('GraphQL response must be an object');
-    }
-
-    const graphqlResponse: GraphQLResponse = {
-      data: parsedData.data,
-      errors: parsedData.errors,
-      extensions: parsedData.extensions,
-      http: {
-        status: httpResponse.status,
-        statusText: httpResponse.statusText,
-        headers: httpResponse.headers,
-        responseTime: httpResponse.responseTime
-      }
-    };
-
-    // Validate that we have either data or errors
-    if (!graphqlResponse.data && !graphqlResponse.errors) {
-      throw new Error('GraphQL response must contain either data or errors');
-    }
-
-    return graphqlResponse;
-  }
-
-  private buildBatchRequest(requests: GraphQLRequest[]): GraphQLRequest {
-    const batchQuery = requests.map((request, index) => {
-      const operationName = request.operationName || `Operation${index}`;
-      
-      // Extract operation type and add alias
-      const queryWithAlias = this.addOperationAlias(request.query, operationName);
-      
-      return {
-        query: queryWithAlias,
-        variables: request.variables,
-        operationName
+      const requestConfig: AxiosRequestConfig = {
+        method: 'POST',
+        url: this.getEndpointPath(),
+        headers: {
+          'Content-Type': 'application/json',
+          ...this.config.headers,
+          ...options?.headers
+        },
+        data: {
+          query: operation.query,
+          variables: operation.variables || {},
+          ...(operation.operationName && { operationName: operation.operationName })
+        },
+        timeout: options?.timeout
       };
-    });
 
-    // Combine all queries into a single request
-    const combinedQuery = batchQuery.map(req => req.query).join('\n\n');
-    const combinedVariables = batchQuery.reduce((acc, req) => {
-      return { ...acc, ...req.variables };
-    }, {});
-
-    return {
-      query: combinedQuery,
-      variables: Object.keys(combinedVariables).length > 0 ? combinedVariables : undefined
-    };
+      const response = await this.httpClient.request(requestConfig);
+      
+      // Validate GraphQL response format
+      this.validateGraphQLResponse(response.data);
+      
+      return response;
+      
+    } catch (error) {
+      const endTime = Date.now();
+      throw this.createGraphQLError(error, endTime - startTime);
+    }
   }
 
-  private parseBatchResponse(
-    httpResponse: RestifiedResponse, 
-    originalRequests: GraphQLRequest[]
-  ): GraphQLResponse[] {
-    const mainResponse = this.parseGraphQLResponse(httpResponse, originalRequests[0]);
-    
-    // For batch responses, we need to split the data back into individual responses
-    // This is a simplified implementation - real batching would require more sophisticated parsing
-    return originalRequests.map(() => mainResponse);
-  }
-
-  private handleGraphQLError(error: Error, request: GraphQLRequest): Error {
-    const enhancedError = new Error(`GraphQL request failed: ${error.message}`);
-    (enhancedError as any).originalError = error;
-    (enhancedError as any).query = request.query;
-    (enhancedError as any).variables = request.variables;
-    return enhancedError;
-  }
-
-  private generateCacheKey(request: GraphQLRequest): string {
-    const key = {
-      query: this.normalizeQuery(request.query),
-      variables: request.variables || {},
-      operationName: request.operationName
-    };
-    return Buffer.from(JSON.stringify(key)).toString('base64');
-  }
-
-  private normalizeQuery(query: string): string {
-    return query
-      .replace(/\s+/g, ' ')
-      .replace(/\s*([{}(),])\s*/g, '$1')
-      .trim();
-  }
-
-  private cacheQuery(original: GraphQLRequest, optimized: GraphQLRequest): void {
-    const cacheKey = this.generateCacheKey(original);
-    
-    // Remove oldest entries if cache is full
-    if (this.queryCache.size >= this.maxCacheSize) {
-      const oldestKey = this.queryCache.keys().next().value;
-      this.queryCache.delete(oldestKey);
+  /**
+   * Perform schema introspection
+   */
+  async introspect(): Promise<IntrospectionResult> {
+    if (!this.config.introspection) {
+      throw new Error('Schema introspection is disabled. Enable it in the GraphQL client configuration.');
     }
 
-    this.queryCache.set(cacheKey, {
-      request: optimized,
-      cachedAt: Date.now(),
-      hits: 0,
-      misses: 1,
-      ttl: 300000 // 5 minutes default TTL
-    });
-  }
-
-  private isCacheExpired(cached: CachedQuery): boolean {
-    return Date.now() - cached.cachedAt > cached.ttl;
-  }
-
-  private getIntrospectionQuery(): string {
-    return `
+    const introspectionQuery = `
       query IntrospectionQuery {
         __schema {
           queryType { name }
@@ -467,14 +195,6 @@ export class GraphQLClient {
           subscriptionType { name }
           types {
             ...FullType
-          }
-          directives {
-            name
-            description
-            locations
-            args {
-              ...InputValue
-            }
           }
         }
       }
@@ -552,495 +272,316 @@ export class GraphQLClient {
         }
       }
     `;
+
+    const response = await this.execute({ query: introspectionQuery });
+    this.schema = response.data as IntrospectionResult;
+    
+    return this.schema;
   }
 
-  private parseSchemaFromIntrospection(introspectionResult: any): GraphQLSchema {
-    if (!introspectionResult || !introspectionResult.__schema) {
-      throw new Error('Invalid introspection result');
+  /**
+   * Get cached schema or perform introspection
+   */
+  async getSchema(): Promise<IntrospectionResult | null> {
+    if (this.schema) {
+      return this.schema;
     }
 
-    const schema = introspectionResult.__schema;
-    
-    return {
-      queryType: schema.queryType?.name,
-      mutationType: schema.mutationType?.name,
-      subscriptionType: schema.subscriptionType?.name,
-      types: this.parseTypes(schema.types),
-      directives: this.parseDirectives(schema.directives)
-    };
-  }
-
-  private parseTypes(types: any[]): GraphQLType[] {
-    return types.map(type => ({
-      kind: type.kind,
-      name: type.name,
-      description: type.description,
-      fields: type.fields?.map((field: any) => ({
-        name: field.name,
-        description: field.description,
-        type: this.parseTypeRef(field.type),
-        args: field.args?.map((arg: any) => ({
-          name: arg.name,
-          description: arg.description,
-          type: this.parseTypeRef(arg.type),
-          defaultValue: arg.defaultValue
-        })) || [],
-        isDeprecated: field.isDeprecated,
-        deprecationReason: field.deprecationReason
-      })) || [],
-      inputFields: type.inputFields?.map((field: any) => ({
-        name: field.name,
-        description: field.description,
-        type: this.parseTypeRef(field.type),
-        defaultValue: field.defaultValue
-      })) || [],
-      interfaces: type.interfaces?.map((iface: any) => this.parseTypeRef(iface)) || [],
-      enumValues: type.enumValues?.map((enumValue: any) => ({
-        name: enumValue.name,
-        description: enumValue.description,
-        isDeprecated: enumValue.isDeprecated,
-        deprecationReason: enumValue.deprecationReason
-      })) || [],
-      possibleTypes: type.possibleTypes?.map((possibleType: any) => this.parseTypeRef(possibleType)) || []
-    }));
-  }
-
-  private parseDirectives(directives: any[]): GraphQLDirective[] {
-    return directives.map(directive => ({
-      name: directive.name,
-      description: directive.description,
-      locations: directive.locations,
-      args: directive.args?.map((arg: any) => ({
-        name: arg.name,
-        description: arg.description,
-        type: this.parseTypeRef(arg.type),
-        defaultValue: arg.defaultValue
-      })) || []
-    }));
-  }
-
-  private parseTypeRef(typeRef: any): GraphQLTypeRef {
-    return {
-      kind: typeRef.kind,
-      name: typeRef.name,
-      ofType: typeRef.ofType ? this.parseTypeRef(typeRef.ofType) : undefined
-    };
-  }
-
-  private performQueryValidation(
-    request: GraphQLRequest, 
-    schema: GraphQLSchema
-  ): GraphQLValidationResult {
-    const parser = new GraphQLQueryParser();
-    
-    try {
-      const parsed = parser.parse(request.query);
-      const errors: string[] = [];
-
-      // Basic validation
-      if (!parsed.operations || parsed.operations.length === 0) {
-        errors.push('Query must contain at least one operation');
-      }
-
-      // Validate operation types exist in schema
-      parsed.operations.forEach(operation => {
-        const operationType = operation.operation;
-        if (operationType === 'query' && !schema.queryType) {
-          errors.push('Schema does not support query operations');
-        } else if (operationType === 'mutation' && !schema.mutationType) {
-          errors.push('Schema does not support mutation operations');
-        } else if (operationType === 'subscription' && !schema.subscriptionType) {
-          errors.push('Schema does not support subscription operations');
-        }
-      });
-
-      // Validate variables if present
-      if (request.variables) {
-        const variableErrors = this.validateVariables(parsed, request.variables);
-        errors.push(...variableErrors);
-      }
-
-      return {
-        isValid: errors.length === 0,
-        errors,
-        warnings: []
-      };
-    } catch (error) {
-      return {
-        isValid: false,
-        errors: [`Parse error: ${(error as Error).message}`],
-        warnings: []
-      };
+    if (this.config.introspection) {
+      return await this.introspect();
     }
+
+    return null;
   }
 
-  private validateVariables(parsed: ParsedQuery, variables: Record<string, any>): string[] {
+  /**
+   * Validate a GraphQL query syntax (basic validation)
+   */
+  validateQuery(query: string): { valid: boolean; errors: string[] } {
     const errors: string[] = [];
-    
-    // Get all variable definitions from the query
-    const variableDefinitions = new Set<string>();
-    parsed.operations.forEach(operation => {
-      operation.variableDefinitions.forEach(varDef => {
-        variableDefinitions.add(varDef.name);
-      });
-    });
 
-    // Check for undefined variables used in query
-    Object.keys(variables).forEach(varName => {
-      if (!variableDefinitions.has(varName)) {
-        errors.push(`Variable '${varName}' is not defined in the query`);
-      }
-    });
-
-    // Check for missing required variables
-    parsed.operations.forEach(operation => {
-      operation.variableDefinitions.forEach(varDef => {
-        if (varDef.required && !(varDef.name in variables)) {
-          errors.push(`Required variable '${varDef.name}' is missing`);
-        }
-      });
-    });
-
-    return errors;
-  }
-
-  private calculateComplexity(parsed: ParsedQuery): number {
-    let complexity = 0;
-    
-    parsed.operations.forEach(operation => {
-      complexity += this.calculateOperationComplexity(operation);
-    });
-    
-    return complexity;
-  }
-
-  private calculateOperationComplexity(operation: GraphQLOperation): number {
-    // Simplified complexity calculation
-    let complexity = 1; // Base complexity for the operation
-    
-    operation.selectionSet.forEach(selection => {
-      complexity += this.calculateSelectionComplexity(selection);
-    });
-    
-    return complexity;
-  }
-
-  private calculateSelectionComplexity(selection: GraphQLSelection): number {
-    let complexity = 1; // Base complexity for the field
-    
-    if (selection.selectionSet) {
-      selection.selectionSet.forEach(nested => {
-        complexity += this.calculateSelectionComplexity(nested);
-      });
+    // Basic syntax validation
+    if (!query.trim()) {
+      errors.push('Query cannot be empty');
     }
-    
-    return complexity;
-  }
 
-  private analyzeDepth(parsed: ParsedQuery): GraphQLDepthAnalysis {
-    let maxDepth = 0;
-    
-    parsed.operations.forEach(operation => {
-      const operationDepth = this.calculateOperationDepth(operation);
-      maxDepth = Math.max(maxDepth, operationDepth);
-    });
-    
+    // Check for basic GraphQL keywords
+    const hasOperation = /^\s*(query|mutation|subscription|fragment|\{)/.test(query.trim());
+    if (!hasOperation) {
+      errors.push('Query must start with a valid GraphQL operation or be a shorthand query');
+    }
+
+    // Check for balanced braces
+    const openBraces = (query.match(/\{/g) || []).length;
+    const closeBraces = (query.match(/\}/g) || []).length;
+    if (openBraces !== closeBraces) {
+      errors.push('Unbalanced braces in query');
+    }
+
+    // Check for balanced parentheses
+    const openParens = (query.match(/\(/g) || []).length;
+    const closeParens = (query.match(/\)/g) || []).length;
+    if (openParens !== closeParens) {
+      errors.push('Unbalanced parentheses in query');
+    }
+
     return {
-      maxDepth,
-      recommendation: maxDepth > 10 ? 'Consider reducing query depth' : 'Query depth is acceptable'
+      valid: errors.length === 0,
+      errors
     };
   }
 
-  private calculateOperationDepth(operation: GraphQLOperation): number {
-    return this.calculateSelectionDepth(operation.selectionSet);
+  /**
+   * Parse and analyze a GraphQL query
+   */
+  analyzeQuery(query: string): {
+    operationType: 'query' | 'mutation' | 'subscription' | 'fragment' | 'unknown';
+    operationName?: string;
+    fields: string[];
+    variables: string[];
+  } {
+    const trimmed = query.trim();
+    
+    // Determine operation type
+    let operationType: 'query' | 'mutation' | 'subscription' | 'fragment' | 'unknown' = 'unknown';
+    if (trimmed.startsWith('query')) operationType = 'query';
+    else if (trimmed.startsWith('mutation')) operationType = 'mutation';
+    else if (trimmed.startsWith('subscription')) operationType = 'subscription';
+    else if (trimmed.startsWith('fragment')) operationType = 'fragment';
+    else if (trimmed.startsWith('{')) operationType = 'query'; // Shorthand query
+
+    // Extract operation name
+    const operationNameMatch = trimmed.match(/^(query|mutation|subscription)\s+(\w+)/);
+    const operationName = operationNameMatch ? operationNameMatch[2] : undefined;
+
+    // Extract field names (basic extraction)
+    const fieldMatches = trimmed.match(/(\w+)(?:\s*\([^)]*\))?\s*(?:\{|$)/g) || [];
+    const fields = fieldMatches
+      .map(match => match.replace(/[\{\(\s].*/g, '').trim())
+      .filter(field => !['query', 'mutation', 'subscription', 'fragment'].includes(field));
+
+    // Extract variable names
+    const variableMatches = trimmed.match(/\$(\w+)/g) || [];
+    const variables = variableMatches.map(match => match.substring(1));
+
+    return {
+      operationType,
+      operationName,
+      fields: [...new Set(fields)], // Remove duplicates
+      variables: [...new Set(variables)] // Remove duplicates
+    };
   }
 
-  private calculateSelectionDepth(selectionSet: GraphQLSelection[]): number {
-    let maxDepth = 0;
+  /**
+   * Update client configuration
+   */
+  updateConfig(newConfig: Partial<GraphQLConfig>): void {
+    this.config = { ...this.config, ...newConfig };
     
-    selectionSet.forEach(selection => {
-      let depth = 1;
-      if (selection.selectionSet) {
-        depth += this.calculateSelectionDepth(selection.selectionSet);
+    // Update endpoint if changed
+    if (newConfig.endpoint) {
+      this.httpClient.updateConfig({ 
+        baseURL: this.extractBaseURL(newConfig.endpoint) 
+      });
+    }
+  }
+
+  /**
+   * Get current configuration
+   */
+  getConfig(): Readonly<GraphQLConfig> {
+    return Object.freeze({ ...this.config });
+  }
+
+  /**
+   * Create a query builder for fluent query construction
+   */
+  queryBuilder(): GraphQLQueryBuilder {
+    return new GraphQLQueryBuilder(this);
+  }
+
+  /**
+   * Extract base URL from endpoint
+   */
+  private extractBaseURL(endpoint: string): string {
+    if (endpoint.startsWith('http')) {
+      const url = new URL(endpoint);
+      return `${url.protocol}//${url.host}`;
+    }
+    return ''; // Relative endpoint
+  }
+
+  /**
+   * Get the endpoint path
+   */
+  private getEndpointPath(): string {
+    if (this.config.endpoint.startsWith('http')) {
+      const url = new URL(this.config.endpoint);
+      return url.pathname + url.search;
+    }
+    return this.config.endpoint;
+  }
+
+  /**
+   * Validate GraphQL response format
+   */
+  private validateGraphQLResponse(data: any): void {
+    if (typeof data !== 'object' || data === null) {
+      throw new Error('Invalid GraphQL response: Response must be an object');
+    }
+
+    if (!('data' in data) && !('errors' in data)) {
+      throw new Error('Invalid GraphQL response: Response must contain either "data" or "errors" field');
+    }
+
+    if ('errors' in data && !Array.isArray(data.errors)) {
+      throw new Error('Invalid GraphQL response: "errors" field must be an array');
+    }
+  }
+
+  /**
+   * Create a GraphQL-specific error
+   */
+  private createGraphQLError(error: any, responseTime: number): RestifiedError {
+    const graphqlError = new Error() as RestifiedError;
+    
+    if (error.response) {
+      // GraphQL errors in response
+      const data = error.response.data as GraphQLResponse;
+      if (data.errors && data.errors.length > 0) {
+        graphqlError.message = `GraphQL Error: ${data.errors.map(e => e.message).join(', ')}`;
+      } else {
+        graphqlError.message = `HTTP Error: ${error.response.status} ${error.response.statusText}`;
       }
-      maxDepth = Math.max(maxDepth, depth);
-    });
-    
-    return maxDepth;
-  }
-
-  private countFields(parsed: ParsedQuery): number {
-    let fieldCount = 0;
-    
-    parsed.operations.forEach(operation => {
-      fieldCount += this.countOperationFields(operation);
-    });
-    
-    return fieldCount;
-  }
-
-  private countOperationFields(operation: GraphQLOperation): number {
-    return this.countSelectionFields(operation.selectionSet);
-  }
-
-  private countSelectionFields(selectionSet: GraphQLSelection[]): number {
-    let count = 0;
-    
-    selectionSet.forEach(selection => {
-      count += 1;
-      if (selection.selectionSet) {
-        count += this.countSelectionFields(selection.selectionSet);
-      }
-    });
-    
-    return count;
-  }
-
-  private generateOptimizationRecommendations(parsed: ParsedQuery): string[] {
-    const recommendations: string[] = [];
-    
-    const complexity = this.calculateComplexity(parsed);
-    if (complexity > 100) {
-      recommendations.push('Query complexity is high. Consider splitting into multiple queries.');
+      graphqlError.response = error.response;
+    } else if (error.request) {
+      graphqlError.message = 'GraphQL Request Error: No response received';
+      graphqlError.request = error.request;
+    } else {
+      graphqlError.message = `GraphQL Client Error: ${error.message}`;
     }
-    
-    const depth = this.analyzeDepth(parsed);
-    if (depth.maxDepth > 10) {
-      recommendations.push('Query depth is excessive. Consider flattening the query structure.');
-    }
-    
-    const fieldCount = this.countFields(parsed);
-    if (fieldCount > 50) {
-      recommendations.push('Query selects many fields. Consider using fragments to reduce duplication.');
-    }
-    
-    return recommendations;
-  }
 
-  private addOperationAlias(query: string, alias: string): string {
-    // Simplified implementation - in production, use a proper GraphQL parser
-    return query.replace(/^(query|mutation|subscription)/, `$1 ${alias}`);
+    graphqlError.name = 'GraphQLError';
+    graphqlError.code = error.code;
+    
+    return graphqlError;
   }
 }
 
 /**
- * Simple GraphQL query parser for basic analysis
+ * GraphQL Query Builder for fluent query construction
  */
-class GraphQLQueryParser {
-  parse(query: string): ParsedQuery {
-    // This is a simplified parser - in production, use a proper GraphQL parser like graphql-js
-    const operations = this.extractOperations(query);
+export class GraphQLQueryBuilder {
+  private client: GraphQLClient;
+  private operationType: 'query' | 'mutation' | 'subscription' = 'query';
+  private operationName?: string;
+  private fields: string[] = [];
+  private variables: Record<string, any> = {};
+  private variableDefinitions: Record<string, string> = {};
+
+  constructor(client: GraphQLClient) {
+    this.client = client;
+  }
+
+  /**
+   * Set operation type to query
+   */
+  query(name?: string): GraphQLQueryBuilder {
+    this.operationType = 'query';
+    this.operationName = name;
+    return this;
+  }
+
+  /**
+   * Set operation type to mutation
+   */
+  mutation(name?: string): GraphQLQueryBuilder {
+    this.operationType = 'mutation';
+    this.operationName = name;
+    return this;
+  }
+
+  /**
+   * Set operation type to subscription
+   */
+  subscription(name?: string): GraphQLQueryBuilder {
+    this.operationType = 'subscription';
+    this.operationName = name;
+    return this;
+  }
+
+  /**
+   * Add a field to the query
+   */
+  field(name: string, args?: Record<string, any>, subfields?: string[]): GraphQLQueryBuilder {
+    let fieldString = name;
     
-    return {
-      operations: operations.map(op => this.parseOperation(op))
-    };
-  }
-
-  private extractOperations(query: string): string[] {
-    // Simplified extraction - splits on operation keywords
-    const operationRegex = /(query|mutation|subscription)\s+[^{]*\{[^}]*\}/gi;
-    const matches = query.match(operationRegex);
-    return matches || [query];
-  }
-
-  private parseOperation(operation: string): GraphQLOperation {
-    const operationType = this.extractOperationType(operation);
-    const operationName = this.extractOperationName(operation);
-    const variableDefinitions = this.extractVariableDefinitions(operation);
-    const selectionSet = this.parseSelectionSet(operation);
-    
-    return {
-      operation: operationType,
-      name: operationName,
-      variableDefinitions,
-      selectionSet
-    };
-  }
-
-  private extractOperationType(operation: string): 'query' | 'mutation' | 'subscription' {
-    const match = operation.match(/^(query|mutation|subscription)/i);
-    return (match?.[1]?.toLowerCase() as any) || 'query';
-  }
-
-  private extractOperationName(operation: string): string | undefined {
-    const match = operation.match(/^(query|mutation|subscription)\s+([a-zA-Z][a-zA-Z0-9_]*)/i);
-    return match?.[2];
-  }
-
-  private extractVariableDefinitions(operation: string): GraphQLVariableDefinition[] {
-    const variableRegex = /\$([a-zA-Z][a-zA-Z0-9_]*)\s*:\s*([^,)]+)(!?)/g;
-    const variables: GraphQLVariableDefinition[] = [];
-    let match;
-    
-    while ((match = variableRegex.exec(operation)) !== null) {
-      variables.push({
-        name: match[1],
-        type: match[2].trim(),
-        required: match[3] === '!'
+    if (args && Object.keys(args).length > 0) {
+      const argStrings = Object.entries(args).map(([key, value]) => {
+        if (typeof value === 'string' && value.startsWith('$')) {
+          return `${key}: ${value}`;
+        }
+        return `${key}: ${JSON.stringify(value)}`;
       });
+      fieldString += `(${argStrings.join(', ')})`;
     }
     
-    return variables;
-  }
-
-  private parseSelectionSet(operation: string): GraphQLSelection[] {
-    // Simplified selection set parsing
-    const fieldRegex = /([a-zA-Z][a-zA-Z0-9_]*)/g;
-    const fields: GraphQLSelection[] = [];
-    let match;
-    
-    while ((match = fieldRegex.exec(operation)) !== null) {
-      fields.push({
-        name: match[1],
-        selectionSet: [] // Simplified - doesn't parse nested selections
-      });
+    if (subfields && subfields.length > 0) {
+      fieldString += ` { ${subfields.join(' ')} }`;
     }
     
-    return fields;
+    this.fields.push(fieldString);
+    return this;
+  }
+
+  /**
+   * Add a variable
+   */
+  variable(name: string, type: string, value: any): GraphQLQueryBuilder {
+    this.variableDefinitions[name] = type;
+    this.variables[name] = value;
+    return this;
+  }
+
+  /**
+   * Build the GraphQL query string
+   */
+  build(): string {
+    let query = this.operationType;
+    
+    if (this.operationName) {
+      query += ` ${this.operationName}`;
+    }
+    
+    if (Object.keys(this.variableDefinitions).length > 0) {
+      const varDefs = Object.entries(this.variableDefinitions)
+        .map(([name, type]) => `$${name}: ${type}`)
+        .join(', ');
+      query += `(${varDefs})`;
+    }
+    
+    query += ` { ${this.fields.join(' ')} }`;
+    
+    return query;
+  }
+
+  /**
+   * Execute the built query
+   */
+  async execute(): Promise<RestifiedResponse> {
+    const queryString = this.build();
+    
+    switch (this.operationType) {
+      case 'query':
+        return this.client.query(queryString, this.variables, { operationName: this.operationName });
+      case 'mutation':
+        return this.client.mutation(queryString, this.variables, { operationName: this.operationName });
+      case 'subscription':
+        return this.client.subscription(queryString, this.variables, { operationName: this.operationName });
+      default:
+        throw new Error(`Unsupported operation type: ${this.operationType}`);
+    }
   }
 }
 
-// ==========================================
-// INTERFACES AND TYPES
-// ==========================================
-
-export interface GraphQLRequestOptions {
-  endpoint?: string;
-  headers?: Record<string, string>;
-  timeout?: number;
-  useCache?: boolean;
-  transformQuery?: (query: string) => string;
-}
-
-export interface GraphQLResponse {
-  data?: any;
-  errors?: GraphQLError[];
-  extensions?: Record<string, any>;
-  http: {
-    status: number;
-    statusText: string;
-    headers: Record<string, string>;
-    responseTime: number;
-  };
-}
-
-export interface GraphQLError {
-  message: string;
-  locations?: Array<{ line: number; column: number }>;
-  path?: Array<string | number>;
-  extensions?: Record<string, any>;
-}
-
-export interface GraphQLSchema {
-  queryType?: string;
-  mutationType?: string;
-  subscriptionType?: string;
-  types: GraphQLType[];
-  directives: GraphQLDirective[];
-}
-
-export interface GraphQLType {
-  kind: string;
-  name?: string;
-  description?: string;
-  fields: GraphQLField[];
-  inputFields: GraphQLInputValue[];
-  interfaces: GraphQLTypeRef[];
-  enumValues: GraphQLEnumValue[];
-  possibleTypes: GraphQLTypeRef[];
-}
-
-export interface GraphQLField {
-  name: string;
-  description?: string;
-  type: GraphQLTypeRef;
-  args: GraphQLInputValue[];
-  isDeprecated: boolean;
-  deprecationReason?: string;
-}
-
-export interface GraphQLInputValue {
-  name: string;
-  description?: string;
-  type: GraphQLTypeRef;
-  defaultValue?: string;
-}
-
-export interface GraphQLEnumValue {
-  name: string;
-  description?: string;
-  isDeprecated: boolean;
-  deprecationReason?: string;
-}
-
-export interface GraphQLDirective {
-  name: string;
-  description?: string;
-  locations: string[];
-  args: GraphQLInputValue[];
-}
-
-export interface GraphQLTypeRef {
-  kind: string;
-  name?: string;
-  ofType?: GraphQLTypeRef;
-}
-
-export interface GraphQLValidationResult {
-  isValid: boolean;
-  errors: string[];
-  warnings: string[];
-}
-
-export interface GraphQLComplexityAnalysis {
-  estimatedComplexity: number;
-  depthAnalysis: GraphQLDepthAnalysis;
-  fieldCount: number;
-  recommendations: string[];
-}
-
-export interface GraphQLDepthAnalysis {
-  maxDepth: number;
-  recommendation: string;
-}
-
-export interface GraphQLCacheStats {
-  totalQueries: number;
-  totalHits: number;
-  totalMisses: number;
-  hitRate: number;
-  cacheSize: number;
-  maxCacheSize: number;
-}
-
-interface CachedQuery {
-  request: GraphQLRequest;
-  cachedAt: number;
-  hits: number;
-  misses: number;
-  ttl: number;
-}
-
-interface ParsedQuery {
-  operations: GraphQLOperation[];
-}
-
-interface GraphQLOperation {
-  operation: 'query' | 'mutation' | 'subscription';
-  name?: string;
-  variableDefinitions: GraphQLVariableDefinition[];
-  selectionSet: GraphQLSelection[];
-}
-
-interface GraphQLVariableDefinition {
-  name: string;
-  type: string;
-  required: boolean;
-}
-
-interface GraphQLSelection {
-  name: string;
-  alias?: string;
-  selectionSet?: GraphQLSelection[];
-  arguments?: Record<string, any>;
-}
+export default GraphQLClient;

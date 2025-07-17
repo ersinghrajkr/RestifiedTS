@@ -1,5 +1,3 @@
-// src/index.ts
-
 /**
  * RestifiedTS - Production-Grade API Testing Framework
  * 
@@ -18,110 +16,122 @@ export { WhenStep } from './core/dsl/WhenStep';
 export { ThenStep } from './core/dsl/ThenStep';
 
 // Client exports
-export { HttpClient } from './core/clients/HttpClient';
-export { GraphQLClient } from './core/clients/GraphQLClient';
-export { WebSocketClient, WebSocketPool } from './core/clients/WebSocketClient';
-export { ClientManager } from './core/clients/ClientManager';
+export { 
+  HttpClient, 
+  GraphQLClient, 
+  GraphQLManager, 
+  GraphQLQueryBuilder,
+  WebSocketClient,
+  WebSocketManager
+} from './core/clients';
 
 // Configuration exports
-export { Config } from './core/config/Config';
-export { ConfigLoader } from './core/config/ConfigLoader';
-export { ConfigValidator } from './core/config/ConfigValidator';
+export { Config, ConfigLoader, ConfigValidator } from './core/config/Config';
 
 // Storage exports
-export { VariableStore } from './core/stores/VariableStore';
-export { ResponseStore } from './core/stores/ResponseStore';
-export { SnapshotStore } from './core/stores/SnapshotStore';
+export { 
+  VariableStore, 
+  ResponseStore, 
+  SnapshotStore, 
+  StorageManager 
+} from './core/stores';
 
 // Authentication exports
-export { AuthProvider } from './core/auth/AuthProvider';
-export { BearerAuth } from './core/auth/BearerAuth';
-export { BasicAuth } from './core/auth/BasicAuth';
-
-// Utility exports
-export { JsonPlaceholderResolver } from './utils/JsonPlaceholderResolver';
-export { JsonPathExtractor } from './utils/JsonPathExtractor';
-export { PerformanceTracker } from './utils/PerformanceTracker';
-export { RetryManager } from './utils/RetryManager';
-export { ValidationUtils } from './utils/ValidationUtils';
-export { WaitUtils, WaitBuilder, CancellationToken, sleep, waitUntil, waitForValue, waitFor } from './utils/WaitUtils';
-
-// Decorator exports
 export { 
-  smoke, 
-  regression, 
-  integration, 
-  unit, 
-  e2e, 
-  critical, 
-  slow, 
-  fast, 
-  flaky, 
-  skip, 
-  tag, 
-  tags,
-  description,
-  timeout,
-  retry,
-  priority,
-  author,
-  issue,
-  dependsOn,
-  group,
-  env,
-  feature,
-  getTags,
-  getTimeout,
-  getRetries,
-  getPriority,
-  getSkipInfo,
-  getTestMetadata,
-  hasTag,
-  hasAnyTag,
-  hasAllTags,
-  getTestMethods,
-  filterTestsByTags,
-  sortTestsByPriority,
-  groupTestsByTag
-} from './decorators/TestTags';
-
-export { TestMetadataManager } from './decorators/TestMetadata';
-export { TagFilter, TagFilterCLI } from './decorators/TagFilter';
-
-// Logging exports
-export { AuditLogger } from './logging/AuditLogger';
-
-// Interceptor exports
-export { InterceptorManager, BuiltInInterceptors } from './interceptors/InterceptorManager';
+  AuthManager, 
+  BearerAuth, 
+  BasicAuth, 
+  ApiKeyAuth, 
+  OAuth2Auth,
+  BaseAuthProvider
+} from './core/auth';
 
 // Assertion exports
-export { ChaiExtensions } from './assertions/ChaiExtensions';
-export { JsonAssertions } from './assertions/JsonAssertions';
-export { ResponseAssertions } from './assertions/ResponseAssertions';
+export { 
+  AssertionEngine, 
+  ResponseAssertions, 
+  SchemaValidator, 
+  AssertionManager,
+  AssertionBuilder,
+  BatchAssertionBuilder,
+  assertionManager
+} from './assertions';
 
-// Reporting exports
-export { ReportGenerator } from './reporting/ReportGenerator';
-export { HtmlReporter } from './reporting/HtmlReporter';
-export { DiffReporter } from './reporting/DiffReporter';
+// Interceptor and Plugin exports
+export { 
+  InterceptorManager,
+  PluginManager,
+  InterceptorPluginSystem,
+  BuiltInInterceptorFactory
+} from './interceptors';
 
-// CLI exports
-export { RestifiedCLI } from './cli/RestifiedCLI';
-export { TestGenerator } from './cli/TestGenerator';
+// Logging and Reporting exports
+export { 
+  RestifiedLogger,
+  TransportFactory
+} from './logging';
 
-// Mock server exports
-export { MockServer } from './utils/MockServer';
-export { FileUploadHandler } from './utils/FileUploadHandler';
+export {
+  ReportingManager,
+  RestifiedReportGenerator,
+  HtmlReportGenerator,
+  JsonReportGenerator,
+  JunitReportGenerator
+} from './reporting';
 
 // Type exports
 export * from './types/RestifiedTypes';
+export { 
+  Logger, 
+  LogLevel, 
+  LogEntry, 
+  LogTransport, 
+  LogFormatter, 
+  LoggerConfig,
+  LogTimer,
+  LogContext,
+  LogFilter,
+  LogMiddleware,
+  LogEvent,
+  LogEventHandler,
+  LogSamplingConfig,
+  LogBufferConfig,
+  LogRotationPolicy,
+  HttpLogEntry,
+  TestLogEntry,
+  PerformanceLogEntry,
+  AuditLogEntry 
+} from './logging/LoggingTypes';
+export { 
+  TestStatus, 
+  TestSeverity, 
+  ReportFormat,
+  TestStepResult,
+  TestCaseResult,
+  TestSuiteResult,
+  TestExecutionResult,
+  TestStatistics,
+  TestEnvironment,
+  TestAttachment,
+  ReportConfig,
+  ReportGenerator,
+  ReportOutput,
+  DashboardData,
+  TestAnalytics,
+  NotificationConfig,
+  CustomReportSection,
+  ReportTemplate,
+  TestMetricsCollector,
+  TestResultsStorage,
+  TestResultsQuery,
+  ReportScheduler,
+  TestExecutionListener,
+  HistoricalTestData,
+  TestTrendData
+} from './reporting/ReportingTypes';
 
-// Error exports
-export {
-  RestifiedError,
-  AssertionError,
-  TimeoutError,
-  RetryError
-} from './types/RestifiedTypes';
+// Re-export for default
+import { RestifiedTS } from './core/dsl/RestifiedTS';
 
 // Default export
 export default RestifiedTS;

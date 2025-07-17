@@ -9,71 +9,52 @@ examples/
 ├── 01-basic-usage/                    # Basic API testing examples
 │   ├── simple-get-request.ts
 │   ├── post-with-json.ts
-│   ├── authentication-basics.ts
+│   ├── query-parameters.ts
 │   └── response-validation.ts
-├── 02-configuration/                  # Configuration examples
-│   ├── environment-setup.ts
-│   ├── proxy-ssl-config.ts
-│   ├── retry-timeout-config.ts
-│   └── global-configuration.ts
+├── 02-advanced-dsl/                   # Advanced DSL features
+│   ├── variable-resolution.ts
+│   ├── response-extraction.ts
+│   └── conditional-logic.ts
 ├── 03-authentication/                 # Authentication examples
 │   ├── bearer-token.ts
 │   ├── basic-auth.ts
 │   ├── oauth2-flow.ts
-│   ├── custom-auth.ts
-│   └── token-refresh.ts
-├── 04-http-client/                    # HTTP client examples
-│   ├── multiple-instances.ts
-│   ├── client-pooling.ts
-│   ├── interceptors.ts
-│   └── custom-headers.ts
-├── 05-validation/                     # Validation examples
-│   ├── json-validation.ts
-│   ├── xml-soap-validation.ts
-│   ├── schema-validation.ts
-│   ├── custom-matchers.ts
-│   └── snapshot-testing.ts
-├── 06-data-management/                # Data management examples
-│   ├── variables-scoping.ts
-│   ├── data-extraction.ts
-│   ├── template-processing.ts
-│   └── file-handling.ts
-├── 07-advanced-testing/               # Advanced testing features
-│   ├── performance-testing.ts
-│   ├── contract-testing.ts
-│   ├── data-driven-testing.ts
-│   └── scenario-testing.ts
-├── 08-microservices/                  # Microservices architecture
-│   ├── service-discovery.ts
-│   ├── distributed-tracing.ts
-│   ├── circuit-breaker.ts
-│   └── cross-service-testing.ts
-├── 09-graphql/                        # GraphQL examples
+│   └── custom-auth.ts
+├── 04-graphql/                       # GraphQL testing examples
 │   ├── basic-queries.ts
 │   ├── mutations.ts
 │   ├── subscriptions.ts
-│   ├── schema-validation.ts
-│   └── introspection.ts
-├── 10-database/                       # Database interaction
-│   ├── database-setup.ts
-│   ├── data-seeding.ts
-│   ├── state-verification.ts
-│   └── cleanup-operations.ts
-├── 11-real-world-scenarios/           # Real-world examples
-│   ├── e-commerce-api.ts
-│   ├── user-management.ts
-│   ├── payment-processing.ts
-│   └── order-fulfillment.ts
-├── 12-enterprise-features/            # Enterprise features
-│   ├── monitoring-alerts.ts
-│   ├── audit-logging.ts
-│   ├── compliance-testing.ts
-│   └── security-scanning.ts
-└── common/                            # Shared utilities
-    ├── test-data/
-    ├── schemas/
-    ├── configurations/
-    └── utilities/
+│   └── schema-validation.ts
+├── 05-websocket/                     # WebSocket testing examples
+│   ├── basic-websocket.ts
+│   ├── message-patterns.ts
+│   └── websocket-auth.ts
+├── 06-database/                      # Database interaction examples
+│   ├── setup-teardown.ts
+│   ├── data-validation.ts
+│   └── transaction-testing.ts
+├── 07-configuration/                 # Configuration examples
+│   ├── environment-configs.ts
+│   ├── multiple-clients.ts
+│   └── custom-interceptors.ts
+├── 08-microservices/                 # Microservices architecture examples
+│   ├── service-discovery.ts
+│   ├── circuit-breaker.ts
+│   ├── distributed-tracing.ts
+│   └── cross-service-testing.ts
+├── 09-testing-patterns/              # Testing patterns and best practices
+│   ├── test-organization.ts
+│   ├── data-driven-tests.ts
+│   ├── parallel-execution.ts
+│   └── test-reporting.ts
+├── 10-real-world-scenarios/          # Complete real-world examples
+│   ├── e-commerce-api/
+│   ├── social-media-api/
+│   └── banking-api/
+└── config/                          # Configuration files for examples
+    ├── development.json
+    ├── staging.json
+    └── production.json
 ```
 
 ## 🚀 Getting Started

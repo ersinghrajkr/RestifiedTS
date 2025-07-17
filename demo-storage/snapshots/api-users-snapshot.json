@@ -1,0 +1,21 @@
+{
+  "key": "api-users-snapshot",
+  "data": {
+    "users": [
+      {
+        "id": 1,
+        "name": "John"
+      },
+      {
+        "id": 2,
+        "name": "Jane"
+      }
+    ]
+  },
+  "timestamp": "2025-07-17T08:52:26.872Z",
+  "metadata": {
+    "test": "user-list-test",
+    "version": "1.0"
+  },
+  "checksum": "20a73fb9dbfa8b9a183d8d8ab2a5ca9030a8a06ae50fd4a295583cc09067f60f"
+}

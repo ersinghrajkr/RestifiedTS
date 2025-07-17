@@ -1,260 +1,417 @@
-// src/core/stores/VariableStore.ts
-
-import { VariableScope } from '../../types/RestifiedTypes';
-
 /**
- * Variable store for managing global and local test variables
- * Supports scoped variable resolution with local override capability
+ * Variable Store for RestifiedTS
+ * 
+ * This module provides comprehensive variable management with support for:
+ * - Global and local variable scopes
+ * - Variable resolution with template syntax
+ * - Type-safe variable access
+ * - Variable persistence and restoration
+ * - Faker.js integration
+ * - Built-in variable generators
  */
+
+import { faker } from '@faker-js/faker';
+import { v4 as uuidv4 } from 'uuid';
+import moment from 'moment';
+import { VariableScope, TemplateContext } from '../../types/RestifiedTypes';
+
 export class VariableStore {
   private globalVariables: Map<string, any> = new Map();
   private localVariables: Map<string, any> = new Map();
-  private readonly reservedKeys = new Set(['this', 'global', 'local', 'undefined', 'null']);
+  private templateContext: TemplateContext;
 
-  /**
-   * Set a global variable
-   * @param key Variable name
-   * @param value Variable value
-   * @throws Error if key is reserved
-   */
-  setGlobal(key: string, value: any): void {
-    this.validateKey(key);
-    this.globalVariables.set(key, this.cloneValue(value));
+  constructor() {
+    this.templateContext = this.createTemplateContext();
   }
 
   /**
-   * Set a local variable (overrides global if exists)
-   * @param key Variable name
-   * @param value Variable value
-   * @throws Error if key is reserved
+   * Set a global variable
    */
-  setLocal(key: string, value: any): void {
-    this.validateKey(key);
-    this.localVariables.set(key, this.cloneValue(value));
+  setGlobal(key: string, value: any): void {
+    this.globalVariables.set(key, value);
+  }
+
+  /**
+   * Get a global variable
+   */
+  getGlobal(key: string): any {
+    return this.globalVariables.get(key);
   }
 
   /**
    * Set multiple global variables
-   * @param variables Object containing key-value pairs
    */
   setGlobalBatch(variables: Record<string, any>): void {
     Object.entries(variables).forEach(([key, value]) => {
-      this.setGlobal(key, value);
+      this.globalVariables.set(key, value);
     });
   }
 
   /**
-   * Set multiple local variables
-   * @param variables Object containing key-value pairs
+   * Get all global variables
    */
-  setLocalBatch(variables: Record<string, any>): void {
-    Object.entries(variables).forEach(([key, value]) => {
-      this.setLocal(key, value);
-    });
+  getAllGlobal(): Record<string, any> {
+    return Object.fromEntries(this.globalVariables);
   }
 
   /**
-   * Get a variable value (local takes precedence over global)
-   * @param key Variable name
-   * @returns Variable value or undefined if not found
-   */
-  get(key: string): any {
-    if (this.localVariables.has(key)) {
-      return this.cloneValue(this.localVariables.get(key));
-    }
-    if (this.globalVariables.has(key)) {
-      return this.cloneValue(this.globalVariables.get(key));
-    }
-    return undefined;
-  }
-
-  /**
-   * Get a global variable (ignores local scope)
-   * @param key Variable name
-   * @returns Global variable value or undefined
-   */
-  getGlobal(key: string): any {
-    const value = this.globalVariables.get(key);
-    return value !== undefined ? this.cloneValue(value) : undefined;
-  }
-
-  /**
-   * Get a local variable (ignores global scope)
-   * @param key Variable name
-   * @returns Local variable value or undefined
-   */
-  getLocal(key: string): any {
-    const value = this.localVariables.get(key);
-    return value !== undefined ? this.cloneValue(value) : undefined;
-  }
-
-  /**
-   * Check if a variable exists (in either scope)
-   * @param key Variable name
-   * @returns True if variable exists
-   */
-  has(key: string): boolean {
-    return this.localVariables.has(key) || this.globalVariables.has(key);
-  }
-
-  /**
-   * Check if a global variable exists
-   * @param key Variable name
-   * @returns True if global variable exists
-   */
-  hasGlobal(key: string): boolean {
-    return this.globalVariables.has(key);
-  }
-
-  /**
-   * Check if a local variable exists
-   * @param key Variable name
-   * @returns True if local variable exists
-   */
-  hasLocal(key: string): boolean {
-    return this.localVariables.has(key);
-  }
-
-  /**
-   * Delete a variable from both scopes
-   * @param key Variable name
-   * @returns True if any variable was deleted
-   */
-  delete(key: string): boolean {
-    const deletedLocal = this.localVariables.delete(key);
-    const deletedGlobal = this.globalVariables.delete(key);
-    return deletedLocal || deletedGlobal;
-  }
-
-  /**
-   * Delete a global variable
-   * @param key Variable name
-   * @returns True if variable was deleted
-   */
-  deleteGlobal(key: string): boolean {
-    return this.globalVariables.delete(key);
-  }
-
-  /**
-   * Delete a local variable
-   * @param key Variable name
-   * @returns True if variable was deleted
-   */
-  deleteLocal(key: string): boolean {
-    return this.localVariables.delete(key);
-  }
-
-  /**
-   * Clear all variables
-   */
-  clearAll(): void {
-    this.globalVariables.clear();
-    this.localVariables.clear();
-  }
-
-  /**
-   * Clear global variables
+   * Clear all global variables
    */
   clearGlobal(): void {
     this.globalVariables.clear();
   }
 
   /**
-   * Clear local variables
+   * Set a local variable
+   */
+  setLocal(key: string, value: any): void {
+    this.localVariables.set(key, value);
+  }
+
+  /**
+   * Get a local variable
+   */
+  getLocal(key: string): any {
+    return this.localVariables.get(key);
+  }
+
+  /**
+   * Set multiple local variables
+   */
+  setLocalBatch(variables: Record<string, any>): void {
+    Object.entries(variables).forEach(([key, value]) => {
+      this.localVariables.set(key, value);
+    });
+  }
+
+  /**
+   * Get all local variables
+   */
+  getAllLocal(): Record<string, any> {
+    return Object.fromEntries(this.localVariables);
+  }
+
+  /**
+   * Clear all local variables
    */
   clearLocal(): void {
     this.localVariables.clear();
   }
 
   /**
-   * Get all variables merged (local overrides global)
-   * @returns Object containing all variables
+   * Get variable with scope resolution (local first, then global)
    */
-  getAll(): Record<string, any> {
-    const merged: Record<string, any> = {};
-    
-    // Add global variables first
-    this.globalVariables.forEach((value, key) => {
-      merged[key] = this.cloneValue(value);
-    });
-    
-    // Local variables override global
-    this.localVariables.forEach((value, key) => {
-      merged[key] = this.cloneValue(value);
-    });
-    
-    return merged;
+  get(key: string): any {
+    return this.localVariables.get(key) ?? this.globalVariables.get(key);
   }
 
   /**
-   * Get all global variables
-   * @returns Object containing global variables
+   * Set variable (local scope by default)
    */
-  getAllGlobal(): Record<string, any> {
-    const global: Record<string, any> = {};
-    this.globalVariables.forEach((value, key) => {
-      global[key] = this.cloneValue(value);
-    });
-    return global;
+  set(key: string, value: any, scope: 'local' | 'global' = 'local'): void {
+    if (scope === 'global') {
+      this.setGlobal(key, value);
+    } else {
+      this.setLocal(key, value);
+    }
   }
 
   /**
-   * Get all local variables
-   * @returns Object containing local variables
+   * Check if variable exists
    */
-  getAllLocal(): Record<string, any> {
-    const local: Record<string, any> = {};
-    this.localVariables.forEach((value, key) => {
-      local[key] = this.cloneValue(value);
-    });
-    return local;
+  has(key: string): boolean {
+    return this.localVariables.has(key) || this.globalVariables.has(key);
   }
 
   /**
-   * Get variable scope information
-   * @returns Variable scope details
+   * Delete variable
    */
-  getScope(): VariableScope {
+  delete(key: string): boolean {
+    return this.localVariables.delete(key) || this.globalVariables.delete(key);
+  }
+
+  /**
+   * Get all variables with scope information
+   */
+  getAll(): VariableScope {
     return {
-      global: new Map(this.globalVariables),
-      local: new Map(this.localVariables)
+      global: this.getAllGlobal(),
+      local: this.getAllLocal()
     };
   }
 
   /**
-   * Get variable keys
-   * @returns Array of all variable keys
+   * Get all variable keys
    */
   getKeys(): string[] {
-    const allKeys = new Set<string>();
-    this.globalVariables.forEach((_, key) => allKeys.add(key));
-    this.localVariables.forEach((_, key) => allKeys.add(key));
-    return Array.from(allKeys);
+    const globalKeys = Array.from(this.globalVariables.keys());
+    const localKeys = Array.from(this.localVariables.keys());
+    return [...new Set([...globalKeys, ...localKeys])];
+  }
+
+  /**
+   * Clear all variables
+   */
+  clearAll(): void {
+    this.clearGlobal();
+    this.clearLocal();
+  }
+
+  /**
+   * Resolve template string with variables
+   */
+  resolve(template: string): string {
+    if (typeof template !== 'string') {
+      return template;
+    }
+
+    return template.replace(/\{\{([^}]+)\}\}/g, (match, expression) => {
+      const trimmed = expression.trim();
+      
+      try {
+        // Handle built-in functions
+        if (trimmed.startsWith('$faker.')) {
+          return this.resolveFaker(trimmed);
+        }
+        
+        if (trimmed.startsWith('$random.')) {
+          return this.resolveRandom(trimmed);
+        }
+        
+        if (trimmed.startsWith('$date.')) {
+          return this.resolveDate(trimmed);
+        }
+        
+        if (trimmed.startsWith('$env.')) {
+          return this.resolveEnvironment(trimmed);
+        }
+        
+        if (trimmed.startsWith('$math.')) {
+          return this.resolveMath(trimmed);
+        }
+        
+        // Handle regular variables
+        const value = this.get(trimmed);
+        return value !== undefined ? String(value) : match;
+        
+      } catch (error) {
+        console.warn(`[VariableStore] Failed to resolve template: ${trimmed}`, error);
+        return match;
+      }
+    });
+  }
+
+  /**
+   * Resolve object with template variables
+   */
+  resolveObject(obj: any): any {
+    if (typeof obj === 'string') {
+      return this.resolve(obj);
+    }
+    
+    if (Array.isArray(obj)) {
+      return obj.map(item => this.resolveObject(item));
+    }
+    
+    if (obj && typeof obj === 'object') {
+      const resolved: any = {};
+      for (const [key, value] of Object.entries(obj)) {
+        resolved[key] = this.resolveObject(value);
+      }
+      return resolved;
+    }
+    
+    return obj;
+  }
+
+  /**
+   * Resolve Faker.js expressions
+   */
+  private resolveFaker(expression: string): string {
+    const path = expression.substring(7); // Remove '$faker.'
+    const parts = path.split('.');
+    
+    let current: any = faker;
+    for (const part of parts) {
+      if (current && typeof current === 'object' && part in current) {
+        current = current[part];
+      } else {
+        throw new Error(`Invalid faker path: ${path}`);
+      }
+    }
+    
+    if (typeof current === 'function') {
+      return current();
+    }
+    
+    return current;
+  }
+
+  /**
+   * Resolve random generators
+   */
+  private resolveRandom(expression: string): string {
+    const path = expression.substring(8); // Remove '$random.'
+    
+    switch (path) {
+      case 'uuid':
+        return uuidv4();
+      case 'int':
+        return Math.floor(Math.random() * 1000).toString();
+      case 'float':
+        return Math.random().toString();
+      case 'boolean':
+        return Math.random() > 0.5 ? 'true' : 'false';
+      case 'string':
+        return Math.random().toString(36).substring(2, 15);
+      default:
+        // Handle parameterized functions like int(1,100)
+        const match = path.match(/^(\w+)\(([^)]+)\)$/);
+        if (match) {
+          const [, func, params] = match;
+          const args = params.split(',').map(p => p.trim());
+          
+          switch (func) {
+            case 'int':
+              const min = parseInt(args[0], 10);
+              const max = parseInt(args[1], 10);
+              return Math.floor(Math.random() * (max - min + 1) + min).toString();
+            case 'float':
+              const fMin = parseFloat(args[0]);
+              const fMax = parseFloat(args[1]);
+              return (Math.random() * (fMax - fMin) + fMin).toString();
+            case 'string':
+              const length = parseInt(args[0], 10) || 10;
+              return Math.random().toString(36).substring(2, 2 + length);
+            default:
+              throw new Error(`Unknown random function: ${func}`);
+          }
+        }
+        
+        throw new Error(`Unknown random generator: ${path}`);
+    }
+  }
+
+  /**
+   * Resolve date expressions
+   */
+  private resolveDate(expression: string): string {
+    const path = expression.substring(6); // Remove '$date.'
+    
+    switch (path) {
+      case 'now':
+        return new Date().toISOString();
+      case 'today':
+        return moment().format('YYYY-MM-DD');
+      case 'yesterday':
+        return moment().subtract(1, 'day').format('YYYY-MM-DD');
+      case 'tomorrow':
+        return moment().add(1, 'day').format('YYYY-MM-DD');
+      case 'timestamp':
+        return Date.now().toString();
+      default:
+        // Handle parameterized functions like format('YYYY-MM-DD')
+        const match = path.match(/^(\w+)\(([^)]+)\)$/);
+        if (match) {
+          const [, func, params] = match;
+          const args = params.split(',').map(p => p.trim().replace(/['"]/g, ''));
+          
+          switch (func) {
+            case 'format':
+              return moment().format(args[0]);
+            case 'add':
+              return moment().add(parseInt(args[0], 10), args[1] as any).toISOString();
+            case 'subtract':
+              return moment().subtract(parseInt(args[0], 10), args[1] as any).toISOString();
+            default:
+              throw new Error(`Unknown date function: ${func}`);
+          }
+        }
+        
+        throw new Error(`Unknown date generator: ${path}`);
+    }
+  }
+
+  /**
+   * Resolve environment variables
+   */
+  private resolveEnvironment(expression: string): string {
+    const envVar = expression.substring(5); // Remove '$env.'
+    return process.env[envVar] || '';
+  }
+
+  /**
+   * Resolve math expressions
+   */
+  private resolveMath(expression: string): string {
+    const path = expression.substring(6); // Remove '$math.'
+    
+    const match = path.match(/^(\w+)\(([^)]+)\)$/);
+    if (match) {
+      const [, func, params] = match;
+      const args = params.split(',').map(p => parseFloat(p.trim()));
+      
+      switch (func) {
+        case 'random':
+          const [min, max] = args;
+          return (Math.random() * (max - min) + min).toString();
+        case 'round':
+          return Math.round(args[0]).toString();
+        case 'floor':
+          return Math.floor(args[0]).toString();
+        case 'ceil':
+          return Math.ceil(args[0]).toString();
+        case 'abs':
+          return Math.abs(args[0]).toString();
+        case 'min':
+          return Math.min(...args).toString();
+        case 'max':
+          return Math.max(...args).toString();
+        default:
+          throw new Error(`Unknown math function: ${func}`);
+      }
+    }
+    
+    throw new Error(`Invalid math expression: ${path}`);
+  }
+
+  /**
+   * Create template context for advanced templating
+   */
+  private createTemplateContext(): TemplateContext {
+    return {
+      variables: this.getAll(),
+      environment: process.env,
+      faker,
+      moment,
+      uuid: uuidv4,
+      random: {
+        int: (min: number, max: number) => Math.floor(Math.random() * (max - min + 1) + min),
+        float: (min: number, max: number) => Math.random() * (max - min) + min,
+        string: (length: number = 10) => Math.random().toString(36).substring(2, 2 + length),
+        boolean: () => Math.random() > 0.5,
+        uuid: uuidv4
+      }
+    };
   }
 
   /**
    * Export variables to JSON
-   * @returns JSON string representation
    */
-  toJSON(): string {
+  exportToJson(): string {
     return JSON.stringify({
       global: this.getAllGlobal(),
-      local: this.getAllLocal()
+      local: this.getAllLocal(),
+      timestamp: new Date().toISOString()
     }, null, 2);
   }
 
   /**
    * Import variables from JSON
-   * @param json JSON string containing variables
-   * @param clearExisting Whether to clear existing variables
    */
-  fromJSON(json: string, clearExisting: boolean = false): void {
+  importFromJson(jsonString: string): void {
     try {
-      const data = JSON.parse(json);
-      
-      if (clearExisting) {
-        this.clearAll();
-      }
+      const data = JSON.parse(jsonString);
       
       if (data.global) {
         this.setGlobalBatch(data.global);
@@ -263,846 +420,92 @@ export class VariableStore {
       if (data.local) {
         this.setLocalBatch(data.local);
       }
+      
     } catch (error) {
-      throw new Error(`Failed to import variables from JSON: ${(error as Error).message}`);
+      throw new Error(`Failed to import variables: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
   /**
-   * Validate variable key
-   * @param key Variable name to validate
-   * @throws Error if key is invalid
-   */
-  private validateKey(key: string): void {
-    if (typeof key !== 'string' || key.trim() === '') {
-      throw new Error('Variable key must be a non-empty string');
-    }
-
-    if (this.reservedKeys.has(key)) {
-      throw new Error(`Variable key '${key}' is reserved`);
-    }
-
-    if (!/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(key)) {
-      throw new Error(`Variable key '${key}' must be a valid identifier`);
-    }
-  }
-
-  /**
-   * Deep clone a value to prevent mutations
-   * @param value Value to clone
-   * @returns Cloned value
-   */
-  private cloneValue(value: any): any {
-    if (value === null || typeof value !== 'object') {
-      return value;
-    }
-
-    if (value instanceof Date) {
-      return new Date(value.getTime());
-    }
-
-    if (Array.isArray(value)) {
-      return value.map(item => this.cloneValue(item));
-    }
-
-    if (typeof value === 'object') {
-      const cloned: any = {};
-      for (const [key, val] of Object.entries(value)) {
-        cloned[key] = this.cloneValue(val);
-      }
-      return cloned;
-    }
-
-    return value;
-  }
-}
-
-// src/core/stores/ResponseStore.ts
-
-import { RestifiedResponse } from '../../types/RestifiedTypes';
-
-/**
- * Response store for managing HTTP responses
- * Provides storage, retrieval, and management of API responses
- */
-export class ResponseStore {
-  private responses: Map<string, RestifiedResponse> = new Map();
-  private readonly maxStoredResponses: number;
-  private readonly insertionOrder: string[] = [];
-
-  constructor(maxStoredResponses: number = 100) {
-    this.maxStoredResponses = maxStoredResponses;
-  }
-
-  /**
-   * Store a response with a key
-   * @param key Unique identifier for the response
-   * @param response Response object to store
-   * @throws Error if key already exists
-   */
-  store(key: string, response: RestifiedResponse): void {
-    this.validateKey(key);
-    
-    if (this.responses.has(key)) {
-      throw new Error(`Response with key '${key}' already exists. Use update() to modify existing responses.`);
-    }
-
-    this.addResponse(key, response);
-  }
-
-  /**
-   * Store or update a response (overwrites if exists)
-   * @param key Unique identifier for the response
-   * @param response Response object to store
-   */
-  storeOrUpdate(key: string, response: RestifiedResponse): void {
-    this.validateKey(key);
-    this.addResponse(key, response);
-  }
-
-  /**
-   * Update an existing response
-   * @param key Response key
-   * @param response New response object
-   * @throws Error if response doesn't exist
-   */
-  update(key: string, response: RestifiedResponse): void {
-    if (!this.responses.has(key)) {
-      throw new Error(`Response with key '${key}' does not exist. Use store() to add new responses.`);
-    }
-    
-    this.responses.set(key, this.cloneResponse(response));
-  }
-
-  /**
-   * Get a stored response
-   * @param key Response key
-   * @returns Cloned response object or undefined if not found
-   */
-  get(key: string): RestifiedResponse | undefined {
-    const response = this.responses.get(key);
-    return response ? this.cloneResponse(response) : undefined;
-  }
-
-  /**
-   * Check if a response exists
-   * @param key Response key
-   * @returns True if response exists
-   */
-  has(key: string): boolean {
-    return this.responses.has(key);
-  }
-
-  /**
-   * Delete a stored response
-   * @param key Response key
-   * @returns True if response was deleted
-   */
-  delete(key: string): boolean {
-    const deleted = this.responses.delete(key);
-    if (deleted) {
-      const index = this.insertionOrder.indexOf(key);
-      if (index > -1) {
-        this.insertionOrder.splice(index, 1);
-      }
-    }
-    return deleted;
-  }
-
-  /**
-   * Clear all stored responses
-   */
-  clear(): void {
-    this.responses.clear();
-    this.insertionOrder.length = 0;
-  }
-
-  /**
-   * Get all stored responses
-   * @returns Map of all responses (cloned)
-   */
-  getAll(): Map<string, RestifiedResponse> {
-    const clonedMap = new Map<string, RestifiedResponse>();
-    this.responses.forEach((response, key) => {
-      clonedMap.set(key, this.cloneResponse(response));
-    });
-    return clonedMap;
-  }
-
-  /**
-   * Get all response keys
-   * @returns Array of response keys in insertion order
-   */
-  getKeys(): string[] {
-    return [...this.insertionOrder];
-  }
-
-  /**
-   * Get response keys matching a pattern
-   * @param pattern RegExp or string pattern to match
-   * @returns Array of matching keys
-   */
-  getKeysMatching(pattern: RegExp | string): string[] {
-    const regex = typeof pattern === 'string' ? new RegExp(pattern) : pattern;
-    return this.insertionOrder.filter(key => regex.test(key));
-  }
-
-  /**
-   * Get responses by status code
-   * @param statusCode HTTP status code
-   * @returns Array of responses with matching status code
-   */
-  getByStatusCode(statusCode: number): { key: string; response: RestifiedResponse }[] {
-    const results: { key: string; response: RestifiedResponse }[] = [];
-    
-    this.responses.forEach((response, key) => {
-      if (response.status === statusCode) {
-        results.push({ key, response: this.cloneResponse(response) });
-      }
-    });
-    
-    return results;
-  }
-
-  /**
-   * Get responses by status code range
-   * @param minStatus Minimum status code (inclusive)
-   * @param maxStatus Maximum status code (inclusive)
-   * @returns Array of responses within status code range
-   */
-  getByStatusRange(minStatus: number, maxStatus: number): { key: string; response: RestifiedResponse }[] {
-    const results: { key: string; response: RestifiedResponse }[] = [];
-    
-    this.responses.forEach((response, key) => {
-      if (response.status >= minStatus && response.status <= maxStatus) {
-        results.push({ key, response: this.cloneResponse(response) });
-      }
-    });
-    
-    return results;
-  }
-
-  /**
-   * Get the most recent response
-   * @returns Most recently stored response or undefined
-   */
-  getLatest(): { key: string; response: RestifiedResponse } | undefined {
-    if (this.insertionOrder.length === 0) {
-      return undefined;
-    }
-    
-    const latestKey = this.insertionOrder[this.insertionOrder.length - 1];
-    const response = this.responses.get(latestKey);
-    
-    return response ? { key: latestKey, response: this.cloneResponse(response) } : undefined;
-  }
-
-  /**
-   * Get response count
-   * @returns Number of stored responses
-   */
-  size(): number {
-    return this.responses.size;
-  }
-
-  /**
-   * Check if store is empty
-   * @returns True if no responses are stored
-   */
-  isEmpty(): boolean {
-    return this.responses.size === 0;
-  }
-
-  /**
-   * Check if store is at capacity
-   * @returns True if store is at maximum capacity
-   */
-  isFull(): boolean {
-    return this.responses.size >= this.maxStoredResponses;
-  }
-
-  /**
-   * Get store statistics
-   * @returns Object containing store statistics
+   * Get variable statistics
    */
   getStats(): {
-    totalResponses: number;
-    maxCapacity: number;
-    utilizationPercentage: number;
-    oldestKey: string | undefined;
-    newestKey: string | undefined;
-    statusCodeDistribution: Record<number, number>;
+    global: number;
+    local: number;
+    total: number;
+    memoryUsage: number;
   } {
-    const statusCodeDistribution: Record<number, number> = {};
-    
-    this.responses.forEach(response => {
-      statusCodeDistribution[response.status] = (statusCodeDistribution[response.status] || 0) + 1;
-    });
-
     return {
-      totalResponses: this.responses.size,
-      maxCapacity: this.maxStoredResponses,
-      utilizationPercentage: (this.responses.size / this.maxStoredResponses) * 100,
-      oldestKey: this.insertionOrder[0],
-      newestKey: this.insertionOrder[this.insertionOrder.length - 1],
-      statusCodeDistribution
+      global: this.globalVariables.size,
+      local: this.localVariables.size,
+      total: this.globalVariables.size + this.localVariables.size,
+      memoryUsage: this.calculateMemoryUsage()
     };
   }
 
   /**
-   * Export responses to JSON
-   * @param keys Optional array of keys to export (exports all if not provided)
-   * @returns JSON string representation
+   * Calculate approximate memory usage
    */
-  toJSON(keys?: string[]): string {
-    const exportData: Record<string, RestifiedResponse> = {};
-    const keysToExport = keys || this.insertionOrder;
+  private calculateMemoryUsage(): number {
+    let size = 0;
     
-    keysToExport.forEach(key => {
-      const response = this.responses.get(key);
-      if (response) {
-        exportData[key] = response;
+    const calculateObjectSize = (obj: any): number => {
+      if (typeof obj === 'string') {
+        return obj.length * 2; // 2 bytes per character in UTF-16
       }
+      if (typeof obj === 'number') {
+        return 8;
+      }
+      if (typeof obj === 'boolean') {
+        return 4;
+      }
+      if (obj === null || obj === undefined) {
+        return 0;
+      }
+      if (Array.isArray(obj)) {
+        return obj.reduce((sum, item) => sum + calculateObjectSize(item), 0);
+      }
+      if (typeof obj === 'object') {
+        return Object.entries(obj).reduce((sum, [key, value]) => {
+          return sum + key.length * 2 + calculateObjectSize(value);
+        }, 0);
+      }
+      return 0;
+    };
+    
+    this.globalVariables.forEach((value, key) => {
+      size += key.length * 2 + calculateObjectSize(value);
     });
     
-    return JSON.stringify(exportData, null, 2);
+    this.localVariables.forEach((value, key) => {
+      size += key.length * 2 + calculateObjectSize(value);
+    });
+    
+    return size;
   }
 
   /**
-   * Import responses from JSON
-   * @param json JSON string containing responses
-   * @param clearExisting Whether to clear existing responses
-   * @param overwriteExisting Whether to overwrite existing keys
+   * Create a snapshot of current variables
    */
-  fromJSON(json: string, clearExisting: boolean = false, overwriteExisting: boolean = false): void {
-    try {
-      const data = JSON.parse(json);
-      
-      if (clearExisting) {
-        this.clear();
-      }
-      
-      Object.entries(data).forEach(([key, response]) => {
-        if (this.responses.has(key) && !overwriteExisting) {
-          throw new Error(`Response with key '${key}' already exists and overwriteExisting is false`);
-        }
-        
-        this.addResponse(key, response as RestifiedResponse);
-      });
-    } catch (error) {
-      throw new Error(`Failed to import responses from JSON: ${(error as Error).message}`);
-    }
-  }
-
-  /**
-   * Validate response key
-   * @param key Key to validate
-   * @throws Error if key is invalid
-   */
-  private validateKey(key: string): void {
-    if (typeof key !== 'string' || key.trim() === '') {
-      throw new Error('Response key must be a non-empty string');
-    }
-  }
-
-  /**
-   * Add response to store with capacity management
-   * @param key Response key
-   * @param response Response object
-   */
-  private addResponse(key: string, response: RestifiedResponse): void {
-    // Remove oldest response if at capacity and adding a new key
-    if (!this.responses.has(key) && this.responses.size >= this.maxStoredResponses) {
-      const oldestKey = this.insertionOrder.shift();
-      if (oldestKey) {
-        this.responses.delete(oldestKey);
-      }
-    }
-
-    // Update insertion order
-    if (!this.responses.has(key)) {
-      this.insertionOrder.push(key);
-    }
-
-    this.responses.set(key, this.cloneResponse(response));
-  }
-
-  /**
-   * Deep clone a response to prevent mutations
-   * @param response Response to clone
-   * @returns Cloned response
-   */
-  private cloneResponse(response: RestifiedResponse): RestifiedResponse {
+  createSnapshot(): VariableScope {
     return {
-      status: response.status,
-      statusText: response.statusText,
-      headers: { ...response.headers },
-      data: this.cloneValue(response.data),
-      responseTime: response.responseTime,
-      url: response.url,
-      config: { ...response.config }
+      global: { ...this.getAllGlobal() },
+      local: { ...this.getAllLocal() }
     };
   }
 
   /**
-   * Deep clone a value
-   * @param value Value to clone
-   * @returns Cloned value
+   * Restore variables from snapshot
    */
-  private cloneValue(value: any): any {
-    if (value === null || typeof value !== 'object') {
-      return value;
+  restoreSnapshot(snapshot: VariableScope): void {
+    this.clearAll();
+    if (snapshot.global) {
+      this.setGlobalBatch(snapshot.global);
     }
-
-    if (value instanceof Date) {
-      return new Date(value.getTime());
+    if (snapshot.local) {
+      this.setLocalBatch(snapshot.local);
     }
-
-    if (Array.isArray(value)) {
-      return value.map(item => this.cloneValue(item));
-    }
-
-    if (typeof value === 'object') {
-      const cloned: any = {};
-      for (const [key, val] of Object.entries(value)) {
-        cloned[key] = this.cloneValue(val);
-      }
-      return cloned;
-    }
-
-    return value;
   }
 }
 
-// src/core/stores/SnapshotStore.ts
-
-import { SnapshotDiff } from '../../types/RestifiedTypes';
-import * as fs from 'fs';
-import * as path from 'path';
-
-/**
- * Snapshot store for managing response snapshots and comparisons
- * Provides snapshot storage, comparison, and diff generation
- */
-export class SnapshotStore {
-  private snapshots: Map<string, any> = new Map();
-  private snapshotMetadata: Map<string, SnapshotMetadata> = new Map();
-  private readonly snapshotDirectory: string;
-
-  constructor(snapshotDirectory: string = './snapshots') {
-    this.snapshotDirectory = snapshotDirectory;
-    this.ensureSnapshotDirectory();
-  }
-
-  /**
-   * Save a snapshot
-   * @param key Snapshot identifier
-   * @param data Data to snapshot
-   * @param metadata Optional metadata
-   */
-  save(key: string, data: any, metadata?: Partial<SnapshotMetadata>): void {
-    this.validateKey(key);
-    
-    const snapshotData = this.cloneValue(data);
-    const snapshotMeta: SnapshotMetadata = {
-      key,
-      timestamp: new Date(),
-      version: this.getNextVersion(key),
-      size: JSON.stringify(snapshotData).length,
-      ...metadata
-    };
-
-    this.snapshots.set(key, snapshotData);
-    this.snapshotMetadata.set(key, snapshotMeta);
-  }
-
-  /**
-   * Get a snapshot
-   * @param key Snapshot identifier
-   * @returns Cloned snapshot data or undefined
-   */
-  get(key: string): any {
-    const snapshot = this.snapshots.get(key);
-    return snapshot ? this.cloneValue(snapshot) : undefined;
-  }
-
-  /**
-   * Check if snapshot exists
-   * @param key Snapshot identifier
-   * @returns True if snapshot exists
-   */
-  has(key: string): boolean {
-    return this.snapshots.has(key);
-  }
-
-  /**
-   * Delete a snapshot
-   * @param key Snapshot identifier
-   * @returns True if snapshot was deleted
-   */
-  delete(key: string): boolean {
-    const deleted = this.snapshots.delete(key);
-    if (deleted) {
-      this.snapshotMetadata.delete(key);
-    }
-    return deleted;
-  }
-
-  /**
-   * Clear all snapshots
-   */
-  clear(): void {
-    this.snapshots.clear();
-    this.snapshotMetadata.clear();
-  }
-
-  /**
-   * Compare current data with stored snapshot
-   * @param key Snapshot identifier
-   * @param currentData Current data to compare
-   * @returns Snapshot diff result
-   */
-  compare(key: string, currentData: any): SnapshotDiff {
-    const storedSnapshot = this.get(key);
-    
-    if (!storedSnapshot) {
-      return {
-        hasDifferences: true,
-        added: [currentData],
-        removed: [],
-        modified: []
-      };
-    }
-
-    return this.generateDiff(storedSnapshot, currentData);
-  }
-
-  /**
-   * Update existing snapshot
-   * @param key Snapshot identifier
-   * @param data New data
-   * @param metadata Optional metadata updates
-   * @throws Error if snapshot doesn't exist
-   */
-  update(key: string, data: any, metadata?: Partial<SnapshotMetadata>): void {
-    if (!this.has(key)) {
-      throw new Error(`Snapshot with key '${key}' does not exist`);
-    }
-    
-    this.save(key, data, metadata);
-  }
-
-  /**
-   * Get all snapshots
-   * @returns Map of all snapshots (cloned)
-   */
-  getAll(): Map<string, any> {
-    const clonedMap = new Map<string, any>();
-    this.snapshots.forEach((snapshot, key) => {
-      clonedMap.set(key, this.cloneValue(snapshot));
-    });
-    return clonedMap;
-  }
-
-  /**
-   * Get snapshot metadata
-   * @param key Snapshot identifier
-   * @returns Snapshot metadata or undefined
-   */
-  getMetadata(key: string): SnapshotMetadata | undefined {
-    return this.snapshotMetadata.get(key);
-  }
-
-  /**
-   * Get all snapshot keys
-   * @returns Array of snapshot keys
-   */
-  getKeys(): string[] {
-    return Array.from(this.snapshots.keys());
-  }
-
-  /**
-   * Get snapshots by pattern
-   * @param pattern RegExp or string pattern to match
-   * @returns Array of matching snapshot keys
-   */
-  getKeysMatching(pattern: RegExp | string): string[] {
-    const regex = typeof pattern === 'string' ? new RegExp(pattern) : pattern;
-    return this.getKeys().filter(key => regex.test(key));
-  }
-
-  /**
-   * Export snapshot to file
-   * @param key Snapshot identifier
-   * @param filePath Optional file path (defaults to snapshot directory)
-   * @returns Promise resolving to file path
-   */
-  async exportToFile(key: string, filePath?: string): Promise<string> {
-    const snapshot = this.get(key);
-    const metadata = this.getMetadata(key);
-    
-    if (!snapshot) {
-      throw new Error(`Snapshot with key '${key}' does not exist`);
-    }
-
-    const fileName = filePath || path.join(this.snapshotDirectory, `${key}.json`);
-    const exportData = {
-      metadata,
-      data: snapshot
-    };
-
-    await fs.promises.writeFile(fileName, JSON.stringify(exportData, null, 2), 'utf-8');
-    return fileName;
-  }
-
-  /**
-   * Import snapshot from file
-   * @param filePath File path to import from
-   * @param key Optional key override
-   * @returns Promise resolving to snapshot key
-   */
-  async importFromFile(filePath: string, key?: string): Promise<string> {
-    try {
-      const fileContent = await fs.promises.readFile(filePath, 'utf-8');
-      const importData = JSON.parse(fileContent);
-      
-      const snapshotKey = key || importData.metadata?.key || path.basename(filePath, '.json');
-      this.save(snapshotKey, importData.data, importData.metadata);
-      
-      return snapshotKey;
-    } catch (error) {
-      throw new Error(`Failed to import snapshot from ${filePath}: ${(error as Error).message}`);
-    }
-  }
-
-  /**
-   * Get snapshot statistics
-   * @returns Object containing snapshot statistics
-   */
-  getStats(): {
-    totalSnapshots: number;
-    totalSize: number;
-    averageSize: number;
-    oldestSnapshot: SnapshotMetadata | undefined;
-    newestSnapshot: SnapshotMetadata | undefined;
-  } {
-    const metadataArray = Array.from(this.snapshotMetadata.values());
-    const totalSize = metadataArray.reduce((sum, meta) => sum + meta.size, 0);
-    
-    const sortedByDate = metadataArray.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
-    
-    return {
-      totalSnapshots: this.snapshots.size,
-      totalSize,
-      averageSize: this.snapshots.size > 0 ? totalSize / this.snapshots.size : 0,
-      oldestSnapshot: sortedByDate[0],
-      newestSnapshot: sortedByDate[sortedByDate.length - 1]
-    };
-  }
-
-  /**
-   * Generate diff between two objects
-   * @param original Original object
-   * @param current Current object
-   * @returns Snapshot diff
-   */
-  private generateDiff(original: any, current: any): SnapshotDiff {
-    const added: any[] = [];
-    const removed: any[] = [];
-    const modified: any[] = [];
-
-    const diff = this.deepDiff(original, current, '');
-    
-    return {
-      hasDifferences: diff.added.length > 0 || diff.removed.length > 0 || diff.modified.length > 0,
-      added: diff.added,
-      removed: diff.removed,
-      modified: diff.modified
-    };
-  }
-
-  /**
-   * Perform deep diff on two objects
-   * @param obj1 First object
-   * @param obj2 Second object
-   * @param path Current path in object tree
-   * @returns Detailed diff information
-   */
-  private deepDiff(obj1: any, obj2: any, path: string): {
-    added: any[];
-    removed: any[];
-    modified: any[];
-  } {
-    const result = { added: [] as any[], removed: [] as any[], modified: [] as any[] };
-
-    if (obj1 === obj2) {
-      return result;
-    }
-
-    if (typeof obj1 !== typeof obj2) {
-      result.modified.push({ path, original: obj1, current: obj2 });
-      return result;
-    }
-
-    if (obj1 === null || obj2 === null || typeof obj1 !== 'object') {
-      if (obj1 !== obj2) {
-        result.modified.push({ path, original: obj1, current: obj2 });
-      }
-      return result;
-    }
-
-    if (Array.isArray(obj1) && Array.isArray(obj2)) {
-      return this.diffArrays(obj1, obj2, path);
-    }
-
-    if (Array.isArray(obj1) || Array.isArray(obj2)) {
-      result.modified.push({ path, original: obj1, current: obj2 });
-      return result;
-    }
-
-    return this.diffObjects(obj1, obj2, path);
-  }
-
-  /**
-   * Diff two arrays
-   * @param arr1 First array
-   * @param arr2 Second array
-   * @param path Current path
-   * @returns Diff result
-   */
-  private diffArrays(arr1: any[], arr2: any[], path: string): {
-    added: any[];
-    removed: any[];
-    modified: any[];
-  } {
-    const result = { added: [] as any[], removed: [] as any[], modified: [] as any[] };
-
-    const maxLength = Math.max(arr1.length, arr2.length);
-    
-    for (let i = 0; i < maxLength; i++) {
-      const currentPath = `${path}[${i}]`;
-      
-      if (i >= arr1.length) {
-        result.added.push({ path: currentPath, value: arr2[i] });
-      } else if (i >= arr2.length) {
-        result.removed.push({ path: currentPath, value: arr1[i] });
-      } else {
-        const itemDiff = this.deepDiff(arr1[i], arr2[i], currentPath);
-        result.added.push(...itemDiff.added);
-        result.removed.push(...itemDiff.removed);
-        result.modified.push(...itemDiff.modified);
-      }
-    }
-
-    return result;
-  }
-
-  /**
-   * Diff two objects
-   * @param obj1 First object
-   * @param obj2 Second object
-   * @param path Current path
-   * @returns Diff result
-   */
-  private diffObjects(obj1: Record<string, any>, obj2: Record<string, any>, path: string): {
-    added: any[];
-    removed: any[];
-    modified: any[];
-  } {
-    const result = { added: [] as any[], removed: [] as any[], modified: [] as any[] };
-    const allKeys = new Set([...Object.keys(obj1), ...Object.keys(obj2)]);
-
-    for (const key of allKeys) {
-      const currentPath = path ? `${path}.${key}` : key;
-      
-      if (!(key in obj1)) {
-        result.added.push({ path: currentPath, value: obj2[key] });
-      } else if (!(key in obj2)) {
-        result.removed.push({ path: currentPath, value: obj1[key] });
-      } else {
-        const keyDiff = this.deepDiff(obj1[key], obj2[key], currentPath);
-        result.added.push(...keyDiff.added);
-        result.removed.push(...keyDiff.removed);
-        result.modified.push(...keyDiff.modified);
-      }
-    }
-
-    return result;
-  }
-
-  /**
-   * Get next version number for a snapshot key
-   * @param key Snapshot identifier
-   * @returns Next version number
-   */
-  private getNextVersion(key: string): number {
-    const existing = this.snapshotMetadata.get(key);
-    return existing ? existing.version + 1 : 1;
-  }
-
-  /**
-   * Ensure snapshot directory exists
-   */
-  private ensureSnapshotDirectory(): void {
-    try {
-      if (!fs.existsSync(this.snapshotDirectory)) {
-        fs.mkdirSync(this.snapshotDirectory, { recursive: true });
-      }
-    } catch (error) {
-      throw new Error(`Failed to create snapshot directory: ${(error as Error).message}`);
-    }
-  }
-
-  /**
-   * Validate snapshot key
-   * @param key Key to validate
-   * @throws Error if key is invalid
-   */
-  private validateKey(key: string): void {
-    if (typeof key !== 'string' || key.trim() === '') {
-      throw new Error('Snapshot key must be a non-empty string');
-    }
-
-    if (!/^[a-zA-Z0-9_-]+$/.test(key)) {
-      throw new Error('Snapshot key must contain only alphanumeric characters, underscores, and hyphens');
-    }
-  }
-
-  /**
-   * Deep clone a value
-   * @param value Value to clone
-   * @returns Cloned value
-   */
-  private cloneValue(value: any): any {
-    if (value === null || typeof value !== 'object') {
-      return value;
-    }
-
-    if (value instanceof Date) {
-      return new Date(value.getTime());
-    }
-
-    if (Array.isArray(value)) {
-      return value.map(item => this.cloneValue(item));
-    }
-
-    if (typeof value === 'object') {
-      const cloned: any = {};
-      for (const [key, val] of Object.entries(value)) {
-        cloned[key] = this.cloneValue(val);
-      }
-      return cloned;
-    }
-
-    return value;
-  }
-}
-
-interface SnapshotMetadata {
-  key: string;
-  timestamp: Date;
-  version: number;
-  size: number;
-  description?: string;
-  tags?: string[];
-}
+export default VariableStore;

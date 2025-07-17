@@ -1,111 +1,178 @@
-// src/core/clients/WebSocketClient.ts
+/**
+ * WebSocket Client for RestifiedTS
+ * 
+ * This module provides WebSocket connection management and testing capabilities
+ * with support for connection lifecycle, message handling, and real-time testing.
+ */
 
+import WebSocket from 'ws';
 import { EventEmitter } from 'events';
-import { 
-  WebSocketConfig, 
-  WebSocketMessage,
-  RestifiedResponse 
-} from '../../types/RestifiedTypes';
+import { WebSocketConfig, RestifiedError } from '../../types/RestifiedTypes';
 
 /**
- * Production-grade WebSocket client with comprehensive features
- * 
- * Features:
- * - Auto-reconnection with exponential backoff
- * - Message queuing and reliable delivery
- * - Heartbeat/ping-pong for connection health
- * - Protocol and subprotocol support
- * - Message filtering and routing
- * - Connection pooling
- * - Compression support
- * - Authentication and authorization
- * - Rate limiting and flow control
- * - Message persistence and replay
- * 
- * @example
- * ```typescript
- * const wsClient = new WebSocketClient({
- *   url: 'wss://api.example.com/ws',
- *   protocols: ['chat', 'notifications'],
- *   reconnect: true,
- *   heartbeat: true
- * });
- * 
- * await wsClient.connect();
- * 
- * wsClient.on('message', (message) => {
- *   console.log('Received:', message);
- * });
- * 
- * await wsClient.send({ type: 'subscribe', channel: 'updates' });
- * ```
+ * WebSocket message types
+ */
+export interface WebSocketMessage {
+  id: string;
+  type: 'text' | 'binary' | 'ping' | 'pong' | 'close';
+  data: any;
+  timestamp: Date;
+  size: number;
+}
+
+/**
+ * WebSocket connection state
+ */
+export type WebSocketState = 'connecting' | 'open' | 'closing' | 'closed' | 'error';
+
+/**
+ * WebSocket connection info
+ */
+export interface WebSocketConnectionInfo {
+  url: string;
+  state: WebSocketState;
+  protocol?: string;
+  extensions?: string;
+  connectedAt?: Date;
+  lastActivity?: Date;
+  messageCount: {
+    sent: number;
+    received: number;
+  };
+  bytesTransferred: {
+    sent: number;
+    received: number;
+  };
+}
+
+/**
+ * WebSocket event types
+ */
+export interface WebSocketEvents {
+  'connection': (info: WebSocketConnectionInfo) => void;
+  'message': (message: WebSocketMessage) => void;
+  'sent': (message: WebSocketMessage) => void;
+  'close': (code: number, reason: string) => void;
+  'error': (error: Error) => void;
+  'ping': (data: Buffer) => void;
+  'pong': (data: Buffer) => void;
+  'reconnect': (attempt: number) => void;
+  'reconnect_failed': (error: Error) => void;
+}
+
+/**
+ * WebSocket message matcher for testing
+ */
+export interface MessageMatcher {
+  type?: 'text' | 'binary';
+  content?: string | RegExp | ((data: any) => boolean);
+  timeout?: number;
+}
+
+/**
+ * WebSocket client implementation
  */
 export class WebSocketClient extends EventEmitter {
   private ws?: WebSocket;
-  private config: WebSocketClientConfig;
-  private connectionState: ConnectionState = 'disconnected';
-  private messageQueue: QueuedMessage[] = [];
-  private reconnectAttempts: number = 0;
+  private config: Required<WebSocketConfig>;
+  private connectionInfo: WebSocketConnectionInfo;
+  private messageHistory: WebSocketMessage[] = [];
+  private reconnectAttempts = 0;
   private reconnectTimer?: NodeJS.Timeout;
-  private heartbeatTimer?: NodeJS.Timeout;
-  private lastPongReceived: number = 0;
-  private messageId: number = 0;
-  private pendingMessages: Map<string, PendingMessage> = new Map();
-  private subscriptions: Map<string, SubscriptionHandler> = new Map();
-  private messageHandlers: Map<string, MessageHandler[]> = new Map();
+  private pingTimer?: NodeJS.Timeout;
+  private isReconnecting = false;
+  private messageIdCounter = 0;
 
   constructor(config: WebSocketConfig) {
     super();
-    this.config = this.mergeWithDefaults(config);
-    this.setupEventHandlers();
+    
+    this.config = {
+      timeout: 30000,
+      pingInterval: 30000,
+      maxReconnectAttempts: 3,
+      reconnectInterval: 5000,
+      protocols: [],
+      headers: {},
+      ...config
+    };
+
+    this.connectionInfo = {
+      url: this.config.url,
+      state: 'closed',
+      messageCount: { sent: 0, received: 0 },
+      bytesTransferred: { sent: 0, received: 0 }
+    };
   }
 
   /**
    * Connect to WebSocket server
-   * 
-   * @returns Promise that resolves when connected
    */
   async connect(): Promise<void> {
-    if (this.connectionState === 'connected' || this.connectionState === 'connecting') {
-      return;
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      throw new Error('WebSocket is already connected');
     }
-
-    this.connectionState = 'connecting';
-    this.emit('connecting');
 
     return new Promise((resolve, reject) => {
       try {
-        this.createWebSocket();
+        this.connectionInfo.state = 'connecting';
         
-        const connectTimeout = setTimeout(() => {
-          reject(new Error(`Connection timeout after ${this.config.timeout}ms`));
+        const options: any = {
+          protocols: this.config.protocols,
+          headers: this.config.headers,
+          handshakeTimeout: this.config.timeout
+        };
+
+        this.ws = new WebSocket(this.config.url, options);
+        
+        // Connection timeout
+        const timeoutId = setTimeout(() => {
+          if (this.ws && this.ws.readyState === WebSocket.CONNECTING) {
+            this.ws.terminate();
+            reject(new Error(`WebSocket connection timeout after ${this.config.timeout}ms`));
+          }
         }, this.config.timeout);
 
-        const onOpen = () => {
-          clearTimeout(connectTimeout);
-          this.connectionState = 'connected';
+        this.ws.on('open', () => {
+          clearTimeout(timeoutId);
+          this.connectionInfo.state = 'open';
+          this.connectionInfo.connectedAt = new Date();
+          this.connectionInfo.lastActivity = new Date();
+          this.connectionInfo.protocol = this.ws!.protocol;
+          this.connectionInfo.extensions = this.ws!.extensions;
+          
           this.reconnectAttempts = 0;
-          this.lastPongReceived = Date.now();
+          this.isReconnecting = false;
           
-          this.emit('connected');
-          this.startHeartbeat();
-          this.processMessageQueue();
-          
+          this.startPingInterval();
+          this.emit('connection', { ...this.connectionInfo });
           resolve();
-        };
+        });
 
-        const onError = (error: Event) => {
-          clearTimeout(connectTimeout);
-          this.connectionState = 'disconnected';
-          this.emit('error', error);
-          reject(new Error('WebSocket connection failed'));
-        };
+        this.ws.on('message', (data: WebSocket.Data, isBinary: boolean) => {
+          this.handleMessage(data, isBinary);
+        });
 
-        this.ws!.addEventListener('open', onOpen, { once: true });
-        this.ws!.addEventListener('error', onError, { once: true });
-        
+        this.ws.on('close', (code: number, reason: Buffer) => {
+          clearTimeout(timeoutId);
+          this.handleClose(code, reason.toString());
+        });
+
+        this.ws.on('error', (error: Error) => {
+          clearTimeout(timeoutId);
+          this.handleError(error);
+          reject(error);
+        });
+
+        this.ws.on('ping', (data: Buffer) => {
+          this.emit('ping', data);
+        });
+
+        this.ws.on('pong', (data: Buffer) => {
+          this.connectionInfo.lastActivity = new Date();
+          this.emit('pong', data);
+        });
+
       } catch (error) {
-        this.connectionState = 'disconnected';
         reject(error);
       }
     });
@@ -113,757 +180,425 @@ export class WebSocketClient extends EventEmitter {
 
   /**
    * Disconnect from WebSocket server
-   * 
-   * @param code - Close code
-   * @param reason - Close reason
    */
   async disconnect(code: number = 1000, reason: string = 'Normal closure'): Promise<void> {
-    this.config.reconnect = false; // Disable auto-reconnect
-    this.stopHeartbeat();
-    this.clearReconnectTimer();
-    
-    if (this.ws && this.connectionState === 'connected') {
-      this.connectionState = 'disconnecting';
-      this.ws.close(code, reason);
-      
-      return new Promise((resolve) => {
-        const onClose = () => {
-          this.connectionState = 'disconnected';
-          this.emit('disconnected', { code, reason });
-          resolve();
-        };
-        
-        this.ws!.addEventListener('close', onClose, { once: true });
-      });
+    if (!this.ws || this.ws.readyState === WebSocket.CLOSED) {
+      return;
     }
-    
-    this.connectionState = 'disconnected';
-  }
 
-  /**
-   * Send a message
-   * 
-   * @param data - Message data
-   * @param options - Send options
-   * @returns Promise that resolves when message is sent
-   */
-  async send(data: any, options: SendOptions = {}): Promise<void> {
-    const message: QueuedMessage = {
-      id: this.generateMessageId(),
-      data,
-      timestamp: Date.now(),
-      retries: 0,
-      maxRetries: options.maxRetries || this.config.maxRetries,
-      requiresAck: options.requiresAck || false,
-      timeout: options.timeout || this.config.messageTimeout
-    };
+    return new Promise((resolve) => {
+      this.connectionInfo.state = 'closing';
+      this.stopReconnect();
+      this.stopPingInterval();
 
-    if (this.connectionState !== 'connected') {
-      if (options.queue !== false) {
-        this.queueMessage(message);
-        return;
-      } else {
-        throw new Error('WebSocket not connected and queueing disabled');
+      if (this.ws!.readyState === WebSocket.OPEN) {
+        this.ws!.close(code, reason);
       }
-    }
 
-    return this.sendMessage(message);
-  }
+      const closeHandler = () => {
+        this.connectionInfo.state = 'closed';
+        resolve();
+      };
 
-  /**
-   * Send a message and wait for response
-   * 
-   * @param data - Message data
-   * @param options - Request options
-   * @returns Promise that resolves with response
-   */
-  async request(data: any, options: RequestOptions = {}): Promise<any> {
-    const messageId = this.generateMessageId();
-    const requestData = {
-      ...data,
-      _id: messageId,
-      _type: 'request'
-    };
-
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        this.pendingMessages.delete(messageId);
-        reject(new Error(`Request timeout after ${options.timeout || 30000}ms`));
-      }, options.timeout || 30000);
-
-      this.pendingMessages.set(messageId, {
-        resolve,
-        reject,
-        timeout,
-        timestamp: Date.now()
-      });
-
-      this.send(requestData, { requiresAck: false })
-        .catch(error => {
-          clearTimeout(timeout);
-          this.pendingMessages.delete(messageId);
-          reject(error);
-        });
+      this.ws!.once('close', closeHandler);
+      
+      // Force close after timeout
+      setTimeout(() => {
+        if (this.ws!.readyState !== WebSocket.CLOSED) {
+          this.ws!.terminate();
+          closeHandler();
+        }
+      }, 5000);
     });
   }
 
   /**
-   * Subscribe to a channel or topic
-   * 
-   * @param channel - Channel identifier
-   * @param handler - Message handler
-   * @param options - Subscription options
-   * @returns Promise that resolves with subscription
+   * Send a text message
    */
-  async subscribe(
-    channel: string, 
-    handler: SubscriptionHandler,
-    options: SubscriptionOptions = {}
-  ): Promise<Subscription> {
-    const subscriptionId = this.generateMessageId();
+  async sendText(text: string): Promise<WebSocketMessage> {
+    this.ensureConnected();
     
-    this.subscriptions.set(subscriptionId, handler);
-    
-    const subscribeMessage = {
-      type: 'subscribe',
-      channel,
-      subscriptionId,
-      ...options.params
+    const message: WebSocketMessage = {
+      id: this.generateMessageId(),
+      type: 'text',
+      data: text,
+      timestamp: new Date(),
+      size: Buffer.byteLength(text, 'utf8')
     };
 
-    await this.send(subscribeMessage);
+    return new Promise((resolve, reject) => {
+      this.ws!.send(text, (error?: Error) => {
+        if (error) {
+          reject(error);
+        } else {
+          this.connectionInfo.messageCount.sent++;
+          this.connectionInfo.bytesTransferred.sent += message.size;
+          this.connectionInfo.lastActivity = new Date();
+          
+          this.messageHistory.push(message);
+          this.emit('sent', message);
+          resolve(message);
+        }
+      });
+    });
+  }
+
+  /**
+   * Send binary data
+   */
+  async sendBinary(data: Buffer): Promise<WebSocketMessage> {
+    this.ensureConnected();
     
-    const subscription: Subscription = {
-      id: subscriptionId,
-      channel,
-      handler,
-      unsubscribe: async () => {
-        this.subscriptions.delete(subscriptionId);
-        await this.send({
-          type: 'unsubscribe',
-          subscriptionId
-        });
-      }
+    const message: WebSocketMessage = {
+      id: this.generateMessageId(),
+      type: 'binary',
+      data,
+      timestamp: new Date(),
+      size: data.length
     };
 
-    this.emit('subscribed', subscription);
-    return subscription;
+    return new Promise((resolve, reject) => {
+      this.ws!.send(data, (error?: Error) => {
+        if (error) {
+          reject(error);
+        } else {
+          this.connectionInfo.messageCount.sent++;
+          this.connectionInfo.bytesTransferred.sent += message.size;
+          this.connectionInfo.lastActivity = new Date();
+          
+          this.messageHistory.push(message);
+          this.emit('sent', message);
+          resolve(message);
+        }
+      });
+    });
   }
 
   /**
-   * Add message handler for specific message types
-   * 
-   * @param messageType - Type of message to handle
-   * @param handler - Message handler function
+   * Send JSON data
    */
-  addMessageHandler(messageType: string, handler: MessageHandler): void {
-    if (!this.messageHandlers.has(messageType)) {
-      this.messageHandlers.set(messageType, []);
-    }
-    this.messageHandlers.get(messageType)!.push(handler);
+  async sendJSON(data: any): Promise<WebSocketMessage> {
+    const jsonString = JSON.stringify(data);
+    return this.sendText(jsonString);
   }
 
   /**
-   * Remove message handler
-   * 
-   * @param messageType - Type of message
-   * @param handler - Handler to remove
+   * Send a ping frame
    */
-  removeMessageHandler(messageType: string, handler: MessageHandler): void {
-    const handlers = this.messageHandlers.get(messageType);
-    if (handlers) {
-      const index = handlers.indexOf(handler);
-      if (index > -1) {
-        handlers.splice(index, 1);
+  async ping(data?: Buffer): Promise<void> {
+    this.ensureConnected();
+    
+    return new Promise((resolve, reject) => {
+      try {
+        this.ws!.ping(data);
+        this.connectionInfo.lastActivity = new Date();
+        resolve();
+      } catch (error) {
+        reject(error);
       }
-    }
+    });
   }
 
   /**
-   * Get connection state
-   * 
-   * @returns Current connection state
+   * Wait for a specific message
    */
-  getConnectionState(): ConnectionState {
-    return this.connectionState;
+  async waitForMessage(matcher: MessageMatcher): Promise<WebSocketMessage> {
+    const timeout = matcher.timeout || 10000;
+    
+    return new Promise((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        this.off('message', messageHandler);
+        reject(new Error(`No matching message received within ${timeout}ms`));
+      }, timeout);
+
+      const messageHandler = (message: WebSocketMessage) => {
+        if (this.matchesMessage(message, matcher)) {
+          clearTimeout(timeoutId);
+          this.off('message', messageHandler);
+          resolve(message);
+        }
+      };
+
+      this.on('message', messageHandler);
+    });
+  }
+
+  /**
+   * Wait for connection to be established
+   */
+  async waitForConnection(timeout: number = 10000): Promise<void> {
+    if (this.connectionInfo.state === 'open') {
+      return;
+    }
+
+    return new Promise((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        this.off('connection', connectionHandler);
+        reject(new Error(`Connection not established within ${timeout}ms`));
+      }, timeout);
+
+      const connectionHandler = () => {
+        clearTimeout(timeoutId);
+        this.off('connection', connectionHandler);
+        resolve();
+      };
+
+      this.on('connection', connectionHandler);
+    });
+  }
+
+  /**
+   * Get connection information
+   */
+  getConnectionInfo(): Readonly<WebSocketConnectionInfo> {
+    return { ...this.connectionInfo };
+  }
+
+  /**
+   * Get message history
+   */
+  getMessageHistory(): Readonly<WebSocketMessage[]> {
+    return [...this.messageHistory];
+  }
+
+  /**
+   * Clear message history
+   */
+  clearMessageHistory(): void {
+    this.messageHistory = [];
+  }
+
+  /**
+   * Filter messages by criteria
+   */
+  findMessages(predicate: (message: WebSocketMessage) => boolean): WebSocketMessage[] {
+    return this.messageHistory.filter(predicate);
+  }
+
+  /**
+   * Get messages by type
+   */
+  getMessagesByType(type: 'text' | 'binary'): WebSocketMessage[] {
+    return this.findMessages(msg => msg.type === type);
+  }
+
+  /**
+   * Get messages within time range
+   */
+  getMessagesInTimeRange(start: Date, end: Date): WebSocketMessage[] {
+    return this.findMessages(msg => msg.timestamp >= start && msg.timestamp <= end);
+  }
+
+  /**
+   * Enable auto-reconnect
+   */
+  enableAutoReconnect(): void {
+    this.config.maxReconnectAttempts = this.config.maxReconnectAttempts || 3;
+  }
+
+  /**
+   * Disable auto-reconnect
+   */
+  disableAutoReconnect(): void {
+    this.config.maxReconnectAttempts = 0;
+    this.stopReconnect();
   }
 
   /**
    * Get connection statistics
-   * 
-   * @returns Connection statistics
    */
-  getStats(): WebSocketStats {
+  getStats(): {
+    state: WebSocketState;
+    uptime?: number;
+    messageCount: { sent: number; received: number };
+    bytesTransferred: { sent: number; received: number };
+    averageMessageSize: { sent: number; received: number };
+    reconnectAttempts: number;
+  } {
+    const now = new Date();
+    const uptime = this.connectionInfo.connectedAt 
+      ? now.getTime() - this.connectionInfo.connectedAt.getTime()
+      : undefined;
+
+    const sentMessages = this.connectionInfo.messageCount.sent;
+    const receivedMessages = this.connectionInfo.messageCount.received;
+
     return {
-      connectionState: this.connectionState,
-      reconnectAttempts: this.reconnectAttempts,
-      queuedMessages: this.messageQueue.length,
-      pendingMessages: this.pendingMessages.size,
-      subscriptions: this.subscriptions.size,
-      lastPongReceived: this.lastPongReceived,
-      uptime: this.connectionState === 'connected' ? Date.now() - this.lastPongReceived : 0
+      state: this.connectionInfo.state,
+      uptime,
+      messageCount: { ...this.connectionInfo.messageCount },
+      bytesTransferred: { ...this.connectionInfo.bytesTransferred },
+      averageMessageSize: {
+        sent: sentMessages > 0 ? this.connectionInfo.bytesTransferred.sent / sentMessages : 0,
+        received: receivedMessages > 0 ? this.connectionInfo.bytesTransferred.received / receivedMessages : 0
+      },
+      reconnectAttempts: this.reconnectAttempts
     };
   }
 
   /**
-   * Clear message queue
+   * Update configuration
    */
-  clearQueue(): void {
-    this.messageQueue.length = 0;
-    this.emit('queueCleared');
+  updateConfig(newConfig: Partial<WebSocketConfig>): void {
+    this.config = { ...this.config, ...newConfig };
+    
+    if (newConfig.url && newConfig.url !== this.connectionInfo.url) {
+      this.connectionInfo.url = newConfig.url;
+    }
+
+    // Restart ping interval if changed
+    if (newConfig.pingInterval !== undefined) {
+      this.stopPingInterval();
+      if (this.connectionInfo.state === 'open') {
+        this.startPingInterval();
+      }
+    }
   }
 
   /**
-   * Get queued messages
-   * 
-   * @returns Array of queued messages
+   * Handle incoming message
    */
-  getQueuedMessages(): QueuedMessage[] {
-    return [...this.messageQueue];
-  }
-
-  // ==========================================
-  // PRIVATE METHODS
-  // ==========================================
-
-  private mergeWithDefaults(config: WebSocketConfig): WebSocketClientConfig {
-    return {
-      url: config.url,
-      protocols: config.protocols,
-      headers: config.headers || {},
-      timeout: config.timeout || 30000,
-      reconnect: true,
-      reconnectDelay: 1000,
-      maxReconnectDelay: 30000,
-      reconnectBackoffFactor: 1.5,
-      maxReconnectAttempts: 10,
-      heartbeat: true,
-      heartbeatInterval: 30000,
-      heartbeatTimeout: 5000,
-      maxRetries: 3,
-      messageTimeout: 30000,
-      queueSize: 1000,
-      compression: false,
-      binaryType: 'blob'
+  private handleMessage(data: WebSocket.Data, isBinary: boolean): void {
+    const message: WebSocketMessage = {
+      id: this.generateMessageId(),
+      type: isBinary ? 'binary' : 'text',
+      data: isBinary ? data : data.toString(),
+      timestamp: new Date(),
+      size: Buffer.isBuffer(data) ? data.length : Buffer.byteLength(data.toString(), 'utf8')
     };
-  }
 
-  private setupEventHandlers(): void {
-    this.on('error', (error) => {
-      console.error('WebSocket error:', error);
-    });
-
-    this.on('disconnected', () => {
-      this.stopHeartbeat();
-      if (this.config.reconnect && this.reconnectAttempts < this.config.maxReconnectAttempts) {
-        this.scheduleReconnect();
-      }
-    });
-  }
-
-  private createWebSocket(): void {
-    const wsUrl = this.config.url;
-    const protocols = this.config.protocols;
+    this.connectionInfo.messageCount.received++;
+    this.connectionInfo.bytesTransferred.received += message.size;
+    this.connectionInfo.lastActivity = new Date();
     
-    if (typeof WebSocket !== 'undefined') {
-      // Browser environment
-      this.ws = new WebSocket(wsUrl, protocols);
-    } else {
-      // Node.js environment
-      const WebSocketImpl = require('ws');
-      this.ws = new WebSocketImpl(wsUrl, protocols, {
-        headers: this.config.headers
-      });
-    }
-
-    this.ws.binaryType = this.config.binaryType;
-    this.setupWebSocketEventHandlers();
-  }
-
-  private setupWebSocketEventHandlers(): void {
-    if (!this.ws) return;
-
-    this.ws.addEventListener('message', (event) => {
-      this.handleMessage(event);
-    });
-
-    this.ws.addEventListener('close', (event) => {
-      this.handleClose(event);
-    });
-
-    this.ws.addEventListener('error', (event) => {
-      this.handleError(event);
-    });
-  }
-
-  private handleMessage(event: MessageEvent): void {
-    try {
-      const message = this.parseMessage(event);
-      this.processMessage(message);
-    } catch (error) {
-      this.emit('parseError', error);
-    }
-  }
-
-  private parseMessage(event: MessageEvent): WebSocketMessage {
-    let data: any;
-    
-    if (typeof event.data === 'string') {
-      try {
-        data = JSON.parse(event.data);
-      } catch (error) {
-        data = event.data;
-      }
-    } else {
-      data = event.data;
-    }
-
-    return {
-      type: typeof event.data === 'string' ? 'text' : 'binary',
-      data,
-      timestamp: new Date()
-    };
-  }
-
-  private processMessage(message: WebSocketMessage): void {
+    this.messageHistory.push(message);
     this.emit('message', message);
-
-    const data = message.data;
-
-    // Handle different message types
-    if (typeof data === 'object' && data !== null) {
-      // Handle pong messages for heartbeat
-      if (data.type === 'pong') {
-        this.lastPongReceived = Date.now();
-        return;
-      }
-
-      // Handle response messages
-      if (data.type === 'response' && data._id) {
-        this.handleResponse(data);
-        return;
-      }
-
-      // Handle subscription messages
-      if (data.subscriptionId) {
-        this.handleSubscriptionMessage(data);
-        return;
-      }
-
-      // Handle acknowledgments
-      if (data.type === 'ack' && data._id) {
-        this.handleAcknowledgment(data);
-        return;
-      }
-
-      // Handle custom message types
-      if (data.type) {
-        this.handleTypedMessage(data);
-        return;
-      }
-    }
-
-    // Emit generic message event
-    this.emit('data', data);
   }
 
-  private handleResponse(data: any): void {
-    const messageId = data._id;
-    const pending = this.pendingMessages.get(messageId);
+  /**
+   * Handle connection close
+   */
+  private handleClose(code: number, reason: string): void {
+    this.connectionInfo.state = 'closed';
+    this.stopPingInterval();
     
-    if (pending) {
-      clearTimeout(pending.timeout);
-      this.pendingMessages.delete(messageId);
-      
-      if (data.error) {
-        pending.reject(new Error(data.error));
-      } else {
-        pending.resolve(data.result || data);
-      }
-    }
-  }
+    this.emit('close', code, reason);
 
-  private handleSubscriptionMessage(data: any): void {
-    const handler = this.subscriptions.get(data.subscriptionId);
-    if (handler) {
-      try {
-        handler(data);
-      } catch (error) {
-        this.emit('subscriptionError', { error, data });
-      }
-    }
-  }
-
-  private handleAcknowledgment(data: any): void {
-    this.emit('ack', data);
-  }
-
-  private handleTypedMessage(data: any): void {
-    const handlers = this.messageHandlers.get(data.type);
-    if (handlers) {
-      handlers.forEach(handler => {
-        try {
-          handler(data);
-        } catch (error) {
-          this.emit('handlerError', { error, data, type: data.type });
-        }
-      });
-    }
-    
-    this.emit(data.type, data);
-  }
-
-  private handleClose(event: CloseEvent): void {
-    this.connectionState = 'disconnected';
-    this.ws = undefined;
-    
-    const closeInfo = {
-      code: event.code,
-      reason: event.reason,
-      wasClean: event.wasClean
-    };
-
-    this.emit('close', closeInfo);
-    this.emit('disconnected', closeInfo);
-  }
-
-  private handleError(event: Event): void {
-    this.emit('error', event);
-  }
-
-  private async sendMessage(message: QueuedMessage): Promise<void> {
-    if (!this.ws || this.connectionState !== 'connected') {
-      throw new Error('WebSocket not connected');
-    }
-
-    try {
-      const serializedData = this.serializeMessage(message.data);
-      this.ws.send(serializedData);
-      
-      if (message.requiresAck) {
-        return this.waitForAcknowledgment(message);
-      }
-      
-      this.emit('sent', message);
-    } catch (error) {
-      if (message.retries < message.maxRetries) {
-        message.retries++;
-        this.queueMessage(message);
-        throw new Error(`Message send failed, queued for retry (${message.retries}/${message.maxRetries})`);
-      } else {
-        throw new Error(`Message send failed after ${message.maxRetries} retries: ${(error as Error).message}`);
-      }
-    }
-  }
-
-  private serializeMessage(data: any): string | ArrayBuffer | Blob {
-    if (typeof data === 'string') {
-      return data;
-    } else if (data instanceof ArrayBuffer || data instanceof Blob) {
-      return data;
-    } else {
-      return JSON.stringify(data);
-    }
-  }
-
-  private waitForAcknowledgment(message: QueuedMessage): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error(`Acknowledgment timeout for message ${message.id}`));
-      }, message.timeout);
-
-      const ackHandler = (ackData: any) => {
-        if (ackData._id === message.id) {
-          clearTimeout(timeout);
-          this.off('ack', ackHandler);
-          resolve();
-        }
-      };
-
-      this.on('ack', ackHandler);
-    });
-  }
-
-  private queueMessage(message: QueuedMessage): void {
-    if (this.messageQueue.length >= this.config.queueSize) {
-      // Remove oldest message if queue is full
-      const oldestMessage = this.messageQueue.shift();
-      this.emit('messageDropped', oldestMessage);
-    }
-    
-    this.messageQueue.push(message);
-    this.emit('messageQueued', message);
-  }
-
-  private async processMessageQueue(): Promise<void> {
-    while (this.messageQueue.length > 0 && this.connectionState === 'connected') {
-      const message = this.messageQueue.shift()!;
-      
-      try {
-        await this.sendMessage(message);
-        this.emit('queuedMessageSent', message);
-      } catch (error) {
-        this.emit('queuedMessageError', { message, error });
-        break; // Stop processing queue on error
-      }
-    }
-  }
-
-  private scheduleReconnect(): void {
-    if (this.reconnectTimer) {
-      return; // Reconnect already scheduled
-    }
-
-    const delay = Math.min(
-      this.config.reconnectDelay * Math.pow(this.config.reconnectBackoffFactor, this.reconnectAttempts),
-      this.config.maxReconnectDelay
-    );
-
-    this.reconnectTimer = setTimeout(() => {
-      this.reconnectTimer = undefined;
+    // Attempt reconnection if enabled and not manually closed
+    if (this.config.maxReconnectAttempts > 0 && 
+        this.reconnectAttempts < this.config.maxReconnectAttempts && 
+        !this.isReconnecting &&
+        code !== 1000) { // Not normal closure
       this.attemptReconnect();
-    }, delay);
-
-    this.emit('reconnectScheduled', { delay, attempt: this.reconnectAttempts + 1 });
-  }
-
-  private async attemptReconnect(): Promise<void> {
-    this.reconnectAttempts++;
-    this.emit('reconnecting', this.reconnectAttempts);
-
-    try {
-      await this.connect();
-      this.emit('reconnected');
-    } catch (error) {
-      this.emit('reconnectFailed', { attempt: this.reconnectAttempts, error });
-      
-      if (this.reconnectAttempts < this.config.maxReconnectAttempts) {
-        this.scheduleReconnect();
-      } else {
-        this.emit('reconnectGiveUp');
-      }
     }
   }
 
-  private clearReconnectTimer(): void {
+  /**
+   * Handle connection error
+   */
+  private handleError(error: Error): void {
+    this.connectionInfo.state = 'error';
+    this.emit('error', error);
+  }
+
+  /**
+   * Attempt to reconnect
+   */
+  private attemptReconnect(): void {
+    if (this.isReconnecting) return;
+    
+    this.isReconnecting = true;
+    this.reconnectAttempts++;
+    
+    this.emit('reconnect', this.reconnectAttempts);
+    
+    this.reconnectTimer = setTimeout(async () => {
+      try {
+        await this.connect();
+      } catch (error) {
+        if (this.reconnectAttempts >= this.config.maxReconnectAttempts) {
+          this.isReconnecting = false;
+          this.emit('reconnect_failed', error instanceof Error ? error : new Error(String(error)));
+        } else {
+          this.isReconnecting = false;
+          this.attemptReconnect();
+        }
+      }
+    }, this.config.reconnectInterval);
+  }
+
+  /**
+   * Stop reconnection attempts
+   */
+  private stopReconnect(): void {
+    this.isReconnecting = false;
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = undefined;
     }
   }
 
-  private startHeartbeat(): void {
-    if (!this.config.heartbeat) {
-      return;
-    }
-
-    this.stopHeartbeat(); // Clear any existing heartbeat
-
-    this.heartbeatTimer = setInterval(() => {
-      this.sendHeartbeat();
-    }, this.config.heartbeatInterval);
-  }
-
-  private stopHeartbeat(): void {
-    if (this.heartbeatTimer) {
-      clearInterval(this.heartbeatTimer);
-      this.heartbeatTimer = undefined;
+  /**
+   * Start ping interval
+   */
+  private startPingInterval(): void {
+    if (this.config.pingInterval > 0) {
+      this.pingTimer = setInterval(() => {
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+          this.ping().catch(error => {
+            console.warn('Ping failed:', error.message);
+          });
+        }
+      }, this.config.pingInterval);
     }
   }
 
-  private sendHeartbeat(): void {
-    if (this.connectionState !== 'connected') {
-      return;
+  /**
+   * Stop ping interval
+   */
+  private stopPingInterval(): void {
+    if (this.pingTimer) {
+      clearInterval(this.pingTimer);
+      this.pingTimer = undefined;
     }
-
-    // Check if we haven't received a pong in too long
-    const timeSinceLastPong = Date.now() - this.lastPongReceived;
-    if (timeSinceLastPong > this.config.heartbeatTimeout + this.config.heartbeatInterval) {
-      this.emit('heartbeatTimeout');
-      this.ws?.close(1000, 'Heartbeat timeout');
-      return;
-    }
-
-    // Send ping
-    this.send({ type: 'ping', timestamp: Date.now() }, { requiresAck: false })
-      .catch(error => {
-        this.emit('heartbeatError', error);
-      });
   }
 
+  /**
+   * Ensure WebSocket is connected
+   */
+  private ensureConnected(): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      throw new Error('WebSocket is not connected');
+    }
+  }
+
+  /**
+   * Generate unique message ID
+   */
   private generateMessageId(): string {
-    return `msg_${Date.now()}_${++this.messageId}`;
+    return `msg_${Date.now()}_${++this.messageIdCounter}`;
   }
 
   /**
-   * Convert WebSocket client to RestifiedResponse format for DSL integration
+   * Check if message matches criteria
    */
-  toRestifiedResponse(): RestifiedResponse {
-    return {
-      status: this.connectionState === 'connected' ? 200 : 500,
-      statusText: this.connectionState === 'connected' ? 'Connected' : 'Disconnected',
-      headers: {
-        'connection': 'websocket',
-        'upgrade': 'websocket'
-      },
-      data: {
-        connectionState: this.connectionState,
-        stats: this.getStats()
-      },
-      responseTime: 0,
-      url: this.config.url,
-      config: {
-        method: 'WEBSOCKET' as any,
-        url: this.config.url,
-        headers: this.config.headers
+  private matchesMessage(message: WebSocketMessage, matcher: MessageMatcher): boolean {
+    if (matcher.type && message.type !== matcher.type) {
+      return false;
+    }
+
+    if (matcher.content) {
+      if (typeof matcher.content === 'string') {
+        return message.data === matcher.content;
+      } else if (matcher.content instanceof RegExp) {
+        return matcher.content.test(message.data);
+      } else if (typeof matcher.content === 'function') {
+        return matcher.content(message.data);
       }
-    };
-  }
-}
-
-/**
- * WebSocket connection pool for managing multiple connections
- */
-export class WebSocketPool {
-  private connections: Map<string, WebSocketClient> = new Map();
-  private defaultConfig: Partial<WebSocketClientConfig> = {};
-
-  constructor(defaultConfig: Partial<WebSocketClientConfig> = {}) {
-    this.defaultConfig = defaultConfig;
-  }
-
-  /**
-   * Create or get WebSocket connection
-   */
-  getConnection(name: string, config?: WebSocketConfig): WebSocketClient {
-    if (this.connections.has(name)) {
-      return this.connections.get(name)!;
     }
 
-    if (!config) {
-      throw new Error(`Configuration required for new connection: ${name}`);
-    }
-
-    const mergedConfig = { ...this.defaultConfig, ...config };
-    const client = new WebSocketClient(mergedConfig);
-    
-    this.connections.set(name, client);
-    return client;
-  }
-
-  /**
-   * Remove connection from pool
-   */
-  async removeConnection(name: string): Promise<void> {
-    const client = this.connections.get(name);
-    if (client) {
-      await client.disconnect();
-      this.connections.delete(name);
-    }
-  }
-
-  /**
-   * Close all connections
-   */
-  async closeAll(): Promise<void> {
-    const promises = Array.from(this.connections.values()).map(client => 
-      client.disconnect()
-    );
-    
-    await Promise.all(promises);
-    this.connections.clear();
-  }
-
-  /**
-   * Get all connection names
-   */
-  getConnectionNames(): string[] {
-    return Array.from(this.connections.keys());
-  }
-
-  /**
-   * Get connection statistics for all connections
-   */
-  getAllStats(): Record<string, WebSocketStats> {
-    const stats: Record<string, WebSocketStats> = {};
-    
-    this.connections.forEach((client, name) => {
-      stats[name] = client.getStats();
-    });
-    
-    return stats;
+    return true;
   }
 }
 
-// ==========================================
-// INTERFACES AND TYPES
-// ==========================================
-
-export interface WebSocketClientConfig extends WebSocketConfig {
-  reconnect: boolean;
-  reconnectDelay: number;
-  maxReconnectDelay: number;
-  reconnectBackoffFactor: number;
-  maxReconnectAttempts: number;
-  heartbeat: boolean;
-  heartbeatInterval: number;
-  heartbeatTimeout: number;
-  maxRetries: number;
-  messageTimeout: number;
-  queueSize: number;
-  compression: boolean;
-  binaryType: 'blob' | 'arraybuffer';
-}
-
-export interface SendOptions {
-  maxRetries?: number;
-  requiresAck?: boolean;
-  timeout?: number;
-  queue?: boolean;
-}
-
-export interface RequestOptions {
-  timeout?: number;
-}
-
-export interface SubscriptionOptions {
-  params?: Record<string, any>;
-}
-
-export interface QueuedMessage {
-  id: string;
-  data: any;
-  timestamp: number;
-  retries: number;
-  maxRetries: number;
-  requiresAck: boolean;
-  timeout: number;
-}
-
-export interface PendingMessage {
-  resolve: (value: any) => void;
-  reject: (error: Error) => void;
-  timeout: NodeJS.Timeout;
-  timestamp: number;
-}
-
-export interface Subscription {
-  id: string;
-  channel: string;
-  handler: SubscriptionHandler;
-  unsubscribe: () => Promise<void>;
-}
-
-export interface WebSocketStats {
-  connectionState: ConnectionState;
-  reconnectAttempts: number;
-  queuedMessages: number;
-  pendingMessages: number;
-  subscriptions: number;
-  lastPongReceived: number;
-  uptime: number;
-}
-
-export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'disconnecting';
-export type SubscriptionHandler = (message: any) => void;
-export type MessageHandler = (message: any) => void; 
+export default WebSocketClient;

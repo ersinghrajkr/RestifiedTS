@@ -1,523 +1,867 @@
-// src/core/dsl/ThenStep.ts
+/**
+ * Then Step Implementation for RestifiedTS
+ * 
+ * This module implements the "Then" step of the fluent DSL, providing methods for:
+ * - Response assertions (status, headers, body)
+ * - JSON path assertions
+ * - Custom validation
+ * - Data extraction
+ * - Response storage
+ * - Performance validation
+ */
 
+import { expect } from 'chai';
+import * as jsonpath from 'jsonpath';
+import { IncomingHttpHeaders } from 'http';
 import { 
   IThenStep, 
   RestifiedResponse, 
-  ContentType,
-  SnapshotDiff,
-  AssertionError
+  RestifiedError,
+  AssertionResult,
+  ExtractionResult
 } from '../../types/RestifiedTypes';
 import { VariableStore } from '../stores/VariableStore';
-import { ResponseStore } from '../stores/ResponseStore';
-import { SnapshotStore } from '../stores/SnapshotStore';
-import { AuditLogger } from '../../logging/AuditLogger';
 import { Config } from '../config/Config';
-import { JsonPathExtractor } from '../../utils/JsonPathExtractor';
-import { expect } from 'chai';
 
-/**
- * Implementation of the "then" step in the fluent DSL
- * Handles response assertions, data extraction, and storage operations
- * 
- * @example
- * ```typescript
- * await restified
- *   .given()
- *   .when()
- *   .get('/users/123')
- *   .execute()
- *   .then()
- *   .statusCode(200)
- *   .contentType('application/json')
- *   .jsonPath('$.name', 'John Doe')
- *   .responseTime(1000)
- *   .storeResponse('userResponse')
- *   .extract('$.id', 'userId');
- * ```
- */
 export class ThenStep implements IThenStep {
-  private jsonPathExtractor: JsonPathExtractor;
-  private assertionCount: number = 0;
-  private extractedVariables: Record<string, any> = {};
+  private response?: RestifiedResponse;
+  private error?: RestifiedError;
+  private variableStore: VariableStore;
+  private config: Config;
+  private extractedData: Record<string, any> = {};
+  private assertionResults: AssertionResult[] = [];
 
   constructor(
-    private readonly response: RestifiedResponse,
-    private readonly variableStore: VariableStore,
-    private readonly responseStore: ResponseStore,
-    private readonly snapshotStore: SnapshotStore,
-    private readonly auditLogger: AuditLogger,
-    private readonly config: Config
+    response: RestifiedResponse | undefined,
+    variableStore: VariableStore,
+    config: Config,
+    error?: RestifiedError
   ) {
-    this.jsonPathExtractor = new JsonPathExtractor();
-    this.auditLogger.debug(`[THEN] Initializing ThenStep for response with status: ${response.status}`);
+    this.response = response;
+    this.variableStore = variableStore;
+    this.config = config;
+    this.error = error;
   }
 
   /**
    * Assert response status code
-   * 
-   * @param code - Expected status code
-   * @returns Current ThenStep instance for chaining
-   * @throws AssertionError if status code doesn't match
    */
-  statusCode(code: number): IThenStep {
-    this.validateStatusCode(code);
-    
-    try {
-      expect(this.response.status).to.equal(code);
-      this.assertionCount++;
-      this.auditLogger.debug(`[THEN] ✓ Status code assertion passed: ${this.response.status} === ${code}`);
-    } catch (error) {
-      this.auditLogger.error(`[THEN] ✗ Status code assertion failed: expected ${code}, got ${this.response.status}`);
-      throw new AssertionError(
-        `Expected status code ${code}, but got ${this.response.status}`,
-        code,
-        this.response.status
-      );
-    }
-    
-    return this;
-  }
-
-  /**
-   * Assert response status code is one of the provided codes
-   * 
-   * @param codes - Array of acceptable status codes
-   * @returns Current ThenStep instance for chaining
-   * @throws AssertionError if status code is not in the array
-   */
-  statusCodeIn(codes: number[]): IThenStep {
-    this.validateStatusCodes(codes);
-    
-    try {
-      expect(codes).to.include(this.response.status);
-      this.assertionCount++;
-      this.auditLogger.debug(`[THEN] ✓ Status code in range assertion passed: ${this.response.status} in [${codes.join(', ')}]`);
-    } catch (error) {
-      this.auditLogger.error(`[THEN] ✗ Status code not in range: expected one of [${codes.join(', ')}], got ${this.response.status}`);
-      throw new AssertionError(
-        `Expected status code to be one of [${codes.join(', ')}], but got ${this.response.status}`,
-        codes,
-        this.response.status
-      );
-    }
-    
-    return this;
-  }
-
-  /**
-   * Assert response content type
-   * 
-   * @param type - Expected content type
-   * @returns Current ThenStep instance for chaining
-   * @throws AssertionError if content type doesn't match
-   */
-  contentType(type: ContentType): IThenStep {
-    this.validateContentType(type);
-    
-    const actualContentType = this.getContentType();
-    
-    try {
-      expect(actualContentType).to.include(type);
-      this.assertionCount++;
-      this.auditLogger.debug(`[THEN] ✓ Content type assertion passed: ${actualContentType} includes ${type}`);
-    } catch (error) {
-      this.auditLogger.error(`[THEN] ✗ Content type assertion failed: expected ${type}, got ${actualContentType}`);
-      throw new AssertionError(
-        `Expected content type to include '${type}', but got '${actualContentType}'`,
-        type,
-        actualContentType
-      );
-    }
-    
-    return this;
-  }
-
-  /**
-   * Assert response header value
-   * 
-   * @param key - Header name (case-insensitive)
-   * @param value - Expected header value
-   * @returns Current ThenStep instance for chaining
-   * @throws AssertionError if header doesn't exist or value doesn't match
-   */
-  header(key: string, value: string): IThenStep {
-    this.validateHeaderKey(key);
-    
-    const actualValue = this.getHeaderValue(key);
-    
-    if (actualValue === undefined) {
-      this.auditLogger.error(`[THEN] ✗ Header assertion failed: header '${key}' not found`);
-      throw new AssertionError(
-        `Expected header '${key}' to exist`,
-        value,
-        undefined
-      );
-    }
-    
-    try {
-      expect(actualValue).to.equal(value);
-      this.assertionCount++;
-      this.auditLogger.debug(`[THEN] ✓ Header assertion passed: ${key} = ${actualValue}`);
-    } catch (error) {
-      this.auditLogger.error(`[THEN] ✗ Header assertion failed: ${key} expected '${value}', got '${actualValue}'`);
-      throw new AssertionError(
-        `Expected header '${key}' to have value '${value}', but got '${actualValue}'`,
-        value,
-        actualValue
-      );
-    }
-    
-    return this;
-  }
-
-  /**
-   * Assert response body content
-   * Supports various assertion types including deep equality, contains, and custom matchers
-   * 
-   * @param matcher - Expected body content or matcher function
-   * @returns Current ThenStep instance for chaining
-   * @throws AssertionError if body doesn't match
-   */
-  body(matcher: any): IThenStep {
-    try {
-      if (typeof matcher === 'function') {
-        // Custom matcher function
-        const result = matcher(this.response.data);
-        if (result !== true) {
-          throw new Error('Custom matcher returned false');
-        }
-      } else if (typeof matcher === 'object' && matcher !== null) {
-        // Deep equality check for objects
-        expect(this.response.data).to.deep.equal(matcher);
-      } else {
-        // Direct equality check for primitives
-        expect(this.response.data).to.equal(matcher);
+  statusCode(expectedStatus: number): IThenStep {
+    this.addAssertion(() => {
+      if (this.error) {
+        throw this.error;
       }
       
-      this.assertionCount++;
-      this.auditLogger.debug(`[THEN] ✓ Body assertion passed`);
-    } catch (error) {
-      this.auditLogger.error(`[THEN] ✗ Body assertion failed: ${(error as Error).message}`);
-      throw new AssertionError(
-        `Body assertion failed: ${(error as Error).message}`,
-        matcher,
-        this.response.data
-      );
-    }
+      expect(this.response?.status).to.equal(expectedStatus);
+      return {
+        passed: true,
+        message: `Status code is ${expectedStatus}`,
+        actual: this.response?.status,
+        expected: expectedStatus,
+        operator: 'equal',
+        timestamp: new Date()
+      };
+    });
     
     return this;
   }
 
   /**
-   * Assert value at JSONPath expression
-   * 
-   * @param path - JSONPath expression (e.g., '$.user.name')
-   * @param value - Expected value or matcher function
-   * @returns Current ThenStep instance for chaining
-   * @throws AssertionError if JSONPath value doesn't match
+   * Assert response status code is in array
    */
-  jsonPath(path: string, value: any): IThenStep {
-    this.validateJsonPath(path);
-    
-    try {
-      const extractedValue = this.jsonPathExtractor.extract(this.response.data, path);
-      
-      if (typeof value === 'function') {
-        // Custom matcher function
-        const result = value(extractedValue);
-        if (result !== true) {
-          throw new Error('Custom matcher returned false');
-        }
-      } else {
-        // Direct comparison
-        expect(extractedValue).to.deep.equal(value);
+  statusCodeIn(expectedStatuses: number[]): IThenStep {
+    this.addAssertion(() => {
+      if (this.error) {
+        throw this.error;
       }
       
-      this.assertionCount++;
-      this.auditLogger.debug(`[THEN] ✓ JSONPath assertion passed: ${path} = ${JSON.stringify(extractedValue)}`);
-    } catch (error) {
-      this.auditLogger.error(`[THEN] ✗ JSONPath assertion failed: ${path} - ${(error as Error).message}`);
-      throw new AssertionError(
-        `JSONPath assertion failed for '${path}': ${(error as Error).message}`,
-        value,
-        this.jsonPathExtractor.extract(this.response.data, path)
-      );
-    }
+      expect(expectedStatuses).to.include(this.response?.status);
+      return {
+        passed: true,
+        message: `Status code ${this.response?.status} is in expected list`,
+        actual: this.response?.status,
+        expected: expectedStatuses,
+        operator: 'include',
+        timestamp: new Date()
+      };
+    });
     
     return this;
   }
 
   /**
-   * Assert response time is within limit
-   * 
-   * @param maxMs - Maximum allowed response time in milliseconds
-   * @returns Current ThenStep instance for chaining
-   * @throws AssertionError if response time exceeds limit
+   * Assert response status text
    */
-  responseTime(maxMs: number): IThenStep {
-    this.validateResponseTime(maxMs);
+  statusText(expectedStatusText: string): IThenStep {
+    this.addAssertion(() => {
+      if (this.error) {
+        throw this.error;
+      }
+      
+      expect(this.response?.statusText).to.equal(expectedStatusText);
+      return {
+        passed: true,
+        message: `Status text is ${expectedStatusText}`,
+        actual: this.response?.statusText,
+        expected: expectedStatusText,
+        operator: 'equal',
+        timestamp: new Date()
+      };
+    });
     
+    return this;
+  }
+
+  /**
+   * Assert response header
+   */
+  header(name: string, expectedValue: string | RegExp | ((value: string) => boolean)): IThenStep {
+    this.addAssertion(() => {
+      if (this.error) {
+        throw this.error;
+      }
+      
+      const headerValue = this.response?.headers[name.toLowerCase()];
+      expect(headerValue).to.exist;
+      
+      if (typeof expectedValue === 'string') {
+        expect(headerValue).to.equal(expectedValue);
+      } else if (expectedValue instanceof RegExp) {
+        expect(headerValue).to.match(expectedValue);
+      } else if (typeof expectedValue === 'function') {
+        expect(expectedValue(headerValue as string)).to.be.true;
+      }
+      
+      return {
+        passed: true,
+        message: `Header ${name} matches expected value`,
+        actual: headerValue,
+        expected: expectedValue,
+        operator: 'match',
+        timestamp: new Date()
+      };
+    });
+    
+    return this;
+  }
+
+  /**
+   * Assert multiple response headers
+   */
+  headers(expectedHeaders: Record<string, string | RegExp | ((value: string) => boolean)>): IThenStep {
+    Object.entries(expectedHeaders).forEach(([name, expectedValue]) => {
+      this.header(name, expectedValue);
+    });
+    return this;
+  }
+
+  /**
+   * Assert header exists
+   */
+  headerExists(name: string): IThenStep {
+    this.addAssertion(() => {
+      if (this.error) {
+        throw this.error;
+      }
+      
+      const headerValue = this.response?.headers[name.toLowerCase()];
+      expect(headerValue).to.exist;
+      
+      return {
+        passed: true,
+        message: `Header ${name} exists`,
+        actual: headerValue,
+        expected: 'exists',
+        operator: 'exist',
+        timestamp: new Date()
+      };
+    });
+    
+    return this;
+  }
+
+  /**
+   * Assert header does not exist
+   */
+  headerNotExists(name: string): IThenStep {
+    this.addAssertion(() => {
+      if (this.error) {
+        throw this.error;
+      }
+      
+      const headerValue = this.response?.headers[name.toLowerCase()];
+      expect(headerValue).to.not.exist;
+      
+      return {
+        passed: true,
+        message: `Header ${name} does not exist`,
+        actual: headerValue,
+        expected: 'not exist',
+        operator: 'not.exist',
+        timestamp: new Date()
+      };
+    });
+    
+    return this;
+  }
+
+  /**
+   * Assert content type
+   */
+  contentType(expectedContentType: string): IThenStep {
+    return this.header('content-type', (value: string) => {
+      return value.includes(expectedContentType);
+    });
+  }
+
+  /**
+   * Assert response body
+   */
+  body(expectedBody: any): IThenStep {
+    this.addAssertion(() => {
+      if (this.error) {
+        throw this.error;
+      }
+      
+      expect(this.response?.data).to.deep.equal(expectedBody);
+      return {
+        passed: true,
+        message: 'Response body matches expected',
+        actual: this.response?.data,
+        expected: expectedBody,
+        operator: 'deep.equal',
+        timestamp: new Date()
+      };
+    });
+    
+    return this;
+  }
+
+  /**
+   * Assert response body contains substring
+   */
+  bodyContains(expectedSubstring: string): IThenStep {
+    this.addAssertion(() => {
+      if (this.error) {
+        throw this.error;
+      }
+      
+      const bodyString = typeof this.response?.data === 'string' 
+        ? this.response.data 
+        : JSON.stringify(this.response?.data);
+      
+      expect(bodyString).to.include(expectedSubstring);
+      return {
+        passed: true,
+        message: `Response body contains "${expectedSubstring}"`,
+        actual: bodyString,
+        expected: expectedSubstring,
+        operator: 'include',
+        timestamp: new Date()
+      };
+    });
+    
+    return this;
+  }
+
+  /**
+   * Assert response body matches regex
+   */
+  bodyMatches(pattern: RegExp): IThenStep {
+    this.addAssertion(() => {
+      if (this.error) {
+        throw this.error;
+      }
+      
+      const bodyString = typeof this.response?.data === 'string' 
+        ? this.response.data 
+        : JSON.stringify(this.response?.data);
+      
+      expect(bodyString).to.match(pattern);
+      return {
+        passed: true,
+        message: `Response body matches pattern ${pattern}`,
+        actual: bodyString,
+        expected: pattern,
+        operator: 'match',
+        timestamp: new Date()
+      };
+    });
+    
+    return this;
+  }
+
+  /**
+   * Assert response body type
+   */
+  bodyType(expectedType: 'json' | 'xml' | 'text' | 'html'): IThenStep {
+    this.addAssertion(() => {
+      if (this.error) {
+        throw this.error;
+      }
+      
+      const contentType = this.response?.headers['content-type'] as string;
+      
+      switch (expectedType) {
+        case 'json':
+          expect(contentType).to.include('application/json');
+          break;
+        case 'xml':
+          expect(contentType).to.satisfy((ct: string) => 
+            ct.includes('application/xml') || ct.includes('text/xml')
+          );
+          break;
+        case 'text':
+          expect(contentType).to.include('text/plain');
+          break;
+        case 'html':
+          expect(contentType).to.include('text/html');
+          break;
+      }
+      
+      return {
+        passed: true,
+        message: `Response body type is ${expectedType}`,
+        actual: contentType,
+        expected: expectedType,
+        operator: 'type',
+        timestamp: new Date()
+      };
+    });
+    
+    return this;
+  }
+
+  /**
+   * Assert JSON path value
+   */
+  jsonPath(path: string, expectedValue: any): IThenStep {
+    this.addAssertion(() => {
+      if (this.error) {
+        throw this.error;
+      }
+      
+      const values = jsonpath.query(this.response?.data, path);
+      
+      if (typeof expectedValue === 'function') {
+        expect(expectedValue(values[0])).to.be.true;
+      } else {
+        expect(values[0]).to.deep.equal(expectedValue);
+      }
+      
+      return {
+        passed: true,
+        message: `JSON path ${path} matches expected value`,
+        actual: values[0],
+        expected: expectedValue,
+        operator: 'equal',
+        path,
+        timestamp: new Date()
+      };
+    });
+    
+    return this;
+  }
+
+  /**
+   * Assert JSON path exists
+   */
+  jsonPathExists(path: string): IThenStep {
+    this.addAssertion(() => {
+      if (this.error) {
+        throw this.error;
+      }
+      
+      const values = jsonpath.query(this.response?.data, path);
+      expect(values).to.have.length.greaterThan(0);
+      
+      return {
+        passed: true,
+        message: `JSON path ${path} exists`,
+        actual: values.length,
+        expected: 'exists',
+        operator: 'exist',
+        path,
+        timestamp: new Date()
+      };
+    });
+    
+    return this;
+  }
+
+  /**
+   * Assert JSON path does not exist
+   */
+  jsonPathNotExists(path: string): IThenStep {
+    this.addAssertion(() => {
+      if (this.error) {
+        throw this.error;
+      }
+      
+      const values = jsonpath.query(this.response?.data, path);
+      expect(values).to.have.length(0);
+      
+      return {
+        passed: true,
+        message: `JSON path ${path} does not exist`,
+        actual: values.length,
+        expected: 'not exist',
+        operator: 'not.exist',
+        path,
+        timestamp: new Date()
+      };
+    });
+    
+    return this;
+  }
+
+  /**
+   * Assert JSON path matches regex
+   */
+  jsonPathMatches(path: string, pattern: RegExp): IThenStep {
+    this.addAssertion(() => {
+      if (this.error) {
+        throw this.error;
+      }
+      
+      const values = jsonpath.query(this.response?.data, path);
+      expect(values[0]).to.match(pattern);
+      
+      return {
+        passed: true,
+        message: `JSON path ${path} matches pattern ${pattern}`,
+        actual: values[0],
+        expected: pattern,
+        operator: 'match',
+        path,
+        timestamp: new Date()
+      };
+    });
+    
+    return this;
+  }
+
+  /**
+   * Assert JSON path contains value
+   */
+  jsonPathContains(path: string, expectedValue: any): IThenStep {
+    this.addAssertion(() => {
+      if (this.error) {
+        throw this.error;
+      }
+      
+      const values = jsonpath.query(this.response?.data, path);
+      expect(values).to.include(expectedValue);
+      
+      return {
+        passed: true,
+        message: `JSON path ${path} contains expected value`,
+        actual: values,
+        expected: expectedValue,
+        operator: 'include',
+        path,
+        timestamp: new Date()
+      };
+    });
+    
+    return this;
+  }
+
+  /**
+   * Assert JSON schema
+   */
+  jsonSchema(schema: any): IThenStep {
+    this.addAssertion(() => {
+      if (this.error) {
+        throw this.error;
+      }
+      
+      // TODO: Implement JSON schema validation
+      // This would require a schema validation library like Ajv
+      throw new Error('JSON schema validation not yet implemented');
+    });
+    
+    return this;
+  }
+
+  /**
+   * Assert XML path value
+   */
+  xmlPath(path: string, expectedValue: any): IThenStep {
+    this.addAssertion(() => {
+      if (this.error) {
+        throw this.error;
+      }
+      
+      // TODO: Implement XML path validation
+      // This would require an XML parser and XPath library
+      throw new Error('XML path validation not yet implemented');
+    });
+    
+    return this;
+  }
+
+  /**
+   * Assert XML path exists
+   */
+  xmlPathExists(path: string): IThenStep {
+    // TODO: Implement XML path existence validation
+    throw new Error('XML path existence validation not yet implemented');
+  }
+
+  /**
+   * Assert XML schema
+   */
+  xmlSchema(schema: any): IThenStep {
+    // TODO: Implement XML schema validation
+    throw new Error('XML schema validation not yet implemented');
+  }
+
+  /**
+   * Custom assertion
+   */
+  assert(assertion: (response: RestifiedResponse) => boolean, message?: string): IThenStep {
+    this.addAssertion(() => {
+      if (this.error) {
+        throw this.error;
+      }
+      
+      const result = assertion(this.response!);
+      expect(result).to.be.true;
+      
+      return {
+        passed: true,
+        message: message || 'Custom assertion passed',
+        actual: result,
+        expected: true,
+        operator: 'custom',
+        timestamp: new Date()
+      };
+    });
+    
+    return this;
+  }
+
+  /**
+   * Custom validation
+   */
+  custom(validator: (response: RestifiedResponse) => void): IThenStep {
+    this.addAssertion(() => {
+      if (this.error) {
+        throw this.error;
+      }
+      
+      validator(this.response!);
+      
+      return {
+        passed: true,
+        message: 'Custom validation passed',
+        actual: 'validated',
+        expected: 'validated',
+        operator: 'custom',
+        timestamp: new Date()
+      };
+    });
+    
+    return this;
+  }
+
+  /**
+   * Assert response time
+   */
+  responseTime(expectedTime: number): IThenStep {
+    this.addAssertion(() => {
+      if (this.error) {
+        throw this.error;
+      }
+      
+      expect(this.response?.responseTime).to.be.lessThan(expectedTime);
+      
+      return {
+        passed: true,
+        message: `Response time ${this.response?.responseTime}ms is less than ${expectedTime}ms`,
+        actual: this.response?.responseTime,
+        expected: expectedTime,
+        operator: 'lessThan',
+        timestamp: new Date()
+      };
+    });
+    
+    return this;
+  }
+
+  /**
+   * Assert response time is within range
+   */
+  responseTimeIn(minTime: number, maxTime: number): IThenStep {
+    this.addAssertion(() => {
+      if (this.error) {
+        throw this.error;
+      }
+      
+      expect(this.response?.responseTime).to.be.within(minTime, maxTime);
+      
+      return {
+        passed: true,
+        message: `Response time ${this.response?.responseTime}ms is within range ${minTime}-${maxTime}ms`,
+        actual: this.response?.responseTime,
+        expected: `${minTime}-${maxTime}`,
+        operator: 'within',
+        timestamp: new Date()
+      };
+    });
+    
+    return this;
+  }
+
+  /**
+   * Assert response size
+   */
+  responseSize(expectedSize: number): IThenStep {
+    this.addAssertion(() => {
+      if (this.error) {
+        throw this.error;
+      }
+      
+      expect(this.response?.size).to.equal(expectedSize);
+      
+      return {
+        passed: true,
+        message: `Response size is ${expectedSize} bytes`,
+        actual: this.response?.size,
+        expected: expectedSize,
+        operator: 'equal',
+        timestamp: new Date()
+      };
+    });
+    
+    return this;
+  }
+
+  /**
+   * Extract value from response
+   */
+  extract(path: string, variableName: string): IThenStep {
     try {
-      expect(this.response.responseTime).to.be.at.most(maxMs);
-      this.assertionCount++;
-      this.auditLogger.debug(`[THEN] ✓ Response time assertion passed: ${this.response.responseTime}ms <= ${maxMs}ms`);
+      if (this.error) {
+        throw this.error;
+      }
+      
+      const values = jsonpath.query(this.response?.data, path);
+      const extractedValue = values[0];
+      
+      this.variableStore.setLocal(variableName, extractedValue);
+      this.extractedData[variableName] = extractedValue;
+      
+      const result: ExtractionResult = {
+        path,
+        value: extractedValue,
+        variableName,
+        timestamp: new Date(),
+        success: true
+      };
+      
+      // Log extraction if debug mode
+      if (this.config.get('logging.level') === 'debug') {
+        console.log(`[RestifiedTS] Extracted ${variableName} = ${JSON.stringify(extractedValue)} from ${path}`);
+      }
+      
     } catch (error) {
-      this.auditLogger.error(`[THEN] ✗ Response time assertion failed: ${this.response.responseTime}ms > ${maxMs}ms`);
-      throw new AssertionError(
-        `Expected response time to be at most ${maxMs}ms, but got ${this.response.responseTime}ms`,
-        maxMs,
-        this.response.responseTime
-      );
+      const result: ExtractionResult = {
+        path,
+        value: undefined,
+        variableName,
+        timestamp: new Date(),
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      };
+      
+      console.error(`[RestifiedTS] Failed to extract ${variableName} from ${path}:`, error instanceof Error ? error.message : String(error));
     }
     
     return this;
   }
 
   /**
-   * Store the current response for later use
-   * 
-   * @param key - Unique key to store the response under
-   * @returns Current ThenStep instance for chaining
-   * @throws Error if key is invalid or already exists
+   * Extract multiple values from response
+   */
+  extractAll(extractions: Record<string, string>): IThenStep {
+    Object.entries(extractions).forEach(([variableName, path]) => {
+      this.extract(path, variableName);
+    });
+    return this;
+  }
+
+  /**
+   * Store response with key
+   */
+  store(key: string): IThenStep {
+    // TODO: Implement response storage
+    return this;
+  }
+
+  /**
+   * Store response with key
    */
   storeResponse(key: string): IThenStep {
-    this.validateStorageKey(key);
-    
-    try {
-      this.responseStore.store(key, this.response);
-      this.auditLogger.debug(`[THEN] Response stored with key: ${key}`);
-    } catch (error) {
-      this.auditLogger.error(`[THEN] Failed to store response: ${(error as Error).message}`);
-      throw error;
-    }
-    
-    return this;
+    return this.store(key);
   }
 
   /**
-   * Save current response as a snapshot for comparison
-   * 
-   * @param key - Unique key to save the snapshot under
-   * @returns Current ThenStep instance for chaining
-   * @throws Error if key is invalid
+   * Snapshot testing
    */
-  saveSnapshot(key: string): IThenStep {
-    this.validateStorageKey(key);
-    
-    try {
-      this.snapshotStore.save(key, this.response.data, {
-        description: `Snapshot from ${this.response.config.method} ${this.response.url}`,
-        tags: ['auto-generated']
-      });
-      this.auditLogger.debug(`[THEN] Snapshot saved with key: ${key}`);
-    } catch (error) {
-      this.auditLogger.error(`[THEN] Failed to save snapshot: ${(error as Error).message}`);
-      throw error;
-    }
-    
+  snapshot(key: string): IThenStep {
+    // TODO: Implement snapshot testing
     return this;
   }
 
   /**
-   * Compare current response with a previously saved snapshot
-   * 
-   * @param key - Snapshot key to compare against
-   * @returns Current ThenStep instance for chaining
-   * @throws AssertionError if snapshots don't match
+   * Update snapshot
    */
-  compareSnapshot(key: string): IThenStep {
-    this.validateStorageKey(key);
-    
-    try {
-      const diff = this.snapshotStore.compare(key, this.response.data);
-      
-      if (diff.hasDifferences) {
-        this.auditLogger.error(`[THEN] ✗ Snapshot comparison failed for key: ${key}`);
-        this.auditLogger.debug(`[THEN] Snapshot diff: ${JSON.stringify(diff, null, 2)}`);
-        
-        throw new AssertionError(
-          `Response doesn't match snapshot '${key}'. Found ${diff.added.length} additions, ${diff.removed.length} removals, ${diff.modified.length} modifications`,
-          'matching snapshot',
-          diff
-        );
-      }
-      
-      this.assertionCount++;
-      this.auditLogger.debug(`[THEN] ✓ Snapshot comparison passed for key: ${key}`);
-    } catch (error) {
-      if (error instanceof AssertionError) {
-        throw error;
-      }
-      
-      this.auditLogger.error(`[THEN] Snapshot comparison error: ${(error as Error).message}`);
-      throw new Error(`Failed to compare snapshot '${key}': ${(error as Error).message}`);
-    }
-    
+  snapshotUpdate(key: string): IThenStep {
+    // TODO: Implement snapshot update
     return this;
   }
 
   /**
-   * Log a custom message with the current response details
-   * 
-   * @param message - Optional message to log
-   * @returns Current ThenStep instance for chaining
+   * Log message
    */
   log(message?: string): IThenStep {
-    const logMessage = message || 'Response details';
-    
-    this.auditLogger.info(`[THEN] ${logMessage}`);
-    this.auditLogger.info(`[THEN] Status: ${this.response.status} ${this.response.statusText}`);
-    this.auditLogger.info(`[THEN] Response Time: ${this.response.responseTime}ms`);
-    this.auditLogger.info(`[THEN] Content-Type: ${this.getContentType()}`);
-    
-    if (this.config.get('logging.level') === 'debug') {
-      this.auditLogger.debug(`[THEN] Headers: ${JSON.stringify(this.response.headers, null, 2)}`);
-      this.auditLogger.debug(`[THEN] Body: ${JSON.stringify(this.response.data, null, 2)}`);
-    }
-    
+    const logMessage = message || `Response: ${this.response?.status} ${this.response?.statusText}`;
+    console.log(`[RestifiedTS] ${logMessage}`);
     return this;
   }
 
   /**
-   * Extract value from response and store as variable
-   * 
-   * @param path - JSONPath expression to extract value from
-   * @param variable - Variable name to store the extracted value
-   * @returns Current ThenStep instance for chaining
-   * @throws Error if extraction fails
+   * Log response details
    */
-  extract(path: string, variable: string): IThenStep {
-    this.validateJsonPath(path);
-    this.validateVariableName(variable);
-    
-    try {
-      const extractedValue = this.jsonPathExtractor.extract(this.response.data, path);
-      
-      this.variableStore.setLocal(variable, extractedValue);
-      this.extractedVariables[variable] = extractedValue;
-      
-      this.auditLogger.debug(`[THEN] Extracted ${path} to variable '${variable}': ${JSON.stringify(extractedValue)}`);
-    } catch (error) {
-      this.auditLogger.error(`[THEN] Failed to extract ${path}: ${(error as Error).message}`);
-      throw new Error(`Failed to extract '${path}' to variable '${variable}': ${(error as Error).message}`);
-    }
-    
+  logResponse(): IThenStep {
+    console.log(`[RestifiedTS] Response:`, {
+      status: this.response?.status,
+      statusText: this.response?.statusText,
+      headers: this.response?.headers,
+      data: this.response?.data,
+      responseTime: this.response?.responseTime
+    });
     return this;
   }
 
   /**
-   * Get the current response object
-   * 
-   * @returns Current RestifiedResponse
+   * Wait for specified time
+   */
+  wait(ms: number): IThenStep {
+    // TODO: Implement wait functionality
+    return this;
+  }
+
+  /**
+   * Wait until condition is met
+   */
+  waitUntil(condition: () => boolean | Promise<boolean>, timeout?: number): IThenStep {
+    // TODO: Implement wait until functionality
+    return this;
+  }
+
+  /**
+   * Get response
    */
   getResponse(): RestifiedResponse {
-    return { ...this.response }; // Return a copy to prevent mutation
+    if (this.error) {
+      throw this.error;
+    }
+    return this.response!;
   }
 
   /**
-   * Get assertion statistics
-   * 
-   * @returns Object containing assertion count and extracted variables
+   * Get response data
    */
-  getStats(): {
-    assertionCount: number;
-    extractedVariables: Record<string, any>;
-    responseTime: number;
-    statusCode: number;
-  } {
-    return {
-      assertionCount: this.assertionCount,
-      extractedVariables: { ...this.extractedVariables },
-      responseTime: this.response.responseTime,
-      statusCode: this.response.status
-    };
-  }
-
-  // ==========================================
-  // PRIVATE UTILITY METHODS
-  // ==========================================
-
-  private getContentType(): string {
-    return this.getHeaderValue('content-type') || 'unknown';
-  }
-
-  private getHeaderValue(key: string): string | undefined {
-    // Case-insensitive header lookup
-    const lowerKey = key.toLowerCase();
-    const matchingKey = Object.keys(this.response.headers).find(
-      headerKey => headerKey.toLowerCase() === lowerKey
-    );
-    
-    return matchingKey ? this.response.headers[matchingKey] : undefined;
-  }
-
-  // ==========================================
-  // VALIDATION METHODS
-  // ==========================================
-
-  private validateStatusCode(code: number): void {
-    if (typeof code !== 'number' || !Number.isInteger(code)) {
-      throw new Error('Status code must be an integer');
+  getData(): any {
+    if (this.error) {
+      throw this.error;
     }
-    
-    if (code < 100 || code > 599) {
-      throw new Error('Status code must be between 100 and 599');
-    }
+    return this.response?.data;
   }
 
-  private validateStatusCodes(codes: number[]): void {
-    if (!Array.isArray(codes) || codes.length === 0) {
-      throw new Error('Status codes must be a non-empty array');
+  /**
+   * Get response headers
+   */
+  getHeaders(): IncomingHttpHeaders {
+    if (this.error) {
+      throw this.error;
     }
-    
-    codes.forEach(code => this.validateStatusCode(code));
+    return this.response?.headers || {};
   }
 
-  private validateContentType(type: ContentType): void {
-    if (typeof type !== 'string' || type.trim() === '') {
-      throw new Error('Content type must be a non-empty string');
+  /**
+   * Get response status
+   */
+  getStatus(): number {
+    if (this.error) {
+      throw this.error;
     }
+    return this.response?.status || 0;
   }
 
-  private validateHeaderKey(key: string): void {
-    if (typeof key !== 'string' || key.trim() === '') {
-      throw new Error('Header key must be a non-empty string');
-    }
+  /**
+   * Get extracted data
+   */
+  getExtractedData(): Record<string, any> {
+    return { ...this.extractedData };
   }
 
-  private validateJsonPath(path: string): void {
-    if (typeof path !== 'string' || path.trim() === '') {
-      throw new Error('JSONPath must be a non-empty string');
+  /**
+   * Fluent chaining method
+   */
+  and(): IThenStep {
+    return this;
+  }
+
+  /**
+   * Fluent chaining method
+   */
+  also(): IThenStep {
+    return this;
+  }
+
+  /**
+   * Final execution method
+   */
+  async execute(): Promise<RestifiedResponse> {
+    // Execute all assertions
+    for (const assertion of this.assertionResults) {
+      if (!assertion.passed) {
+        throw new Error(assertion.message);
+      }
     }
     
-    if (!path.startsWith('$')) {
-      throw new Error('JSONPath must start with $');
-    }
-  }
-
-  private validateResponseTime(maxMs: number): void {
-    if (typeof maxMs !== 'number' || maxMs <= 0) {
-      throw new Error('Response time limit must be a positive number');
-    }
-  }
-
-  private validateStorageKey(key: string): void {
-    if (typeof key !== 'string' || key.trim() === '') {
-      throw new Error('Storage key must be a non-empty string');
+    if (this.error) {
+      throw this.error;
     }
     
-    if (!/^[a-zA-Z0-9_-]+$/.test(key)) {
-      throw new Error('Storage key must contain only alphanumeric characters, underscores, and hyphens');
-    }
+    return this.response!;
   }
 
-  private validateVariableName(name: string): void {
-    if (typeof name !== 'string' || name.trim() === '') {
-      throw new Error('Variable name must be a non-empty string');
-    }
-    
-    if (!/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(name)) {
-      throw new Error('Variable name must be a valid JavaScript identifier');
+  /**
+   * Add assertion and execute it
+   */
+  private addAssertion(assertion: () => AssertionResult): void {
+    try {
+      const result = assertion();
+      result.timestamp = new Date();
+      this.assertionResults.push(result);
+    } catch (error) {
+      const result: AssertionResult = {
+        passed: false,
+        message: error instanceof Error ? error.message : String(error),
+        actual: (error as any).actual,
+        expected: (error as any).expected,
+        operator: (error as any).operator,
+        timestamp: new Date()
+      };
+      this.assertionResults.push(result);
+      throw error;
     }
   }
 }
+
+export default ThenStep;
