@@ -155,6 +155,45 @@ export class RestifiedTS {
     return this;
   }
 
+   /**
+   * Set a Local variable
+   */
+  setLocalVariable(key: string, value: any): RestifiedTS {
+    this.variableStore.setLocal(key, value);
+    return this;
+  }
+
+  /**
+   * Get a Local variable
+   */
+  getLocalVariable(key: string): any {
+    return this.variableStore.getLocal(key);
+  }
+
+  /**
+   * Set multiple Local variables
+   */
+  setLocalVariables(variables: Record<string, any>): RestifiedTS {
+    this.variableStore.setLocalBatch(variables);
+    return this;
+  }
+
+  /**
+   * Get all Local variables
+   */
+  getAllLocalVariables(): Record<string, any> {
+    return this.variableStore.getAllLocal();
+  }
+
+  /**
+   * Clear all Local variables
+   */
+  clearLocalVariables(): RestifiedTS {
+    this.variableStore.clearLocal();
+    return this;
+  }
+
+
   /**
    * Get current configuration
    */

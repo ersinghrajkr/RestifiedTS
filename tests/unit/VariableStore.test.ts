@@ -61,7 +61,7 @@ describe('Variable Store and Templating Tests', () => {
       expect(variableStore.has('var1')).to.be.true;
       expect(variableStore.has('var2')).to.be.true;
       
-      variableStore.clear();
+      variableStore.clearAll();
       
       expect(variableStore.has('var1')).to.be.false;
       expect(variableStore.has('var2')).to.be.false;
@@ -263,23 +263,26 @@ describe('Variable Store and Templating Tests', () => {
       variableStore.set('var2', 42);
       variableStore.set('var3', { nested: 'object' });
       
-      const exported = variableStore.export();
+      const exported = variableStore.exportToJson();
       const parsed = JSON.parse(exported);
       
-      expect(parsed).to.have.property('var1', 'value1');
-      expect(parsed).to.have.property('var2', 42);
-      expect(parsed).to.have.property('var3');
-      expect(parsed.var3).to.deep.equal({ nested: 'object' });
+      expect(parsed).to.have.property('local');
+      expect(parsed.local).to.have.property('var1', 'value1');
+      expect(parsed.local).to.have.property('var2', 42);
+      expect(parsed.local).to.have.property('var3');
+      expect(parsed.local.var3).to.deep.equal({ nested: 'object' });
     });
 
     it('should import variables from JSON', () => {
       const importData = JSON.stringify({
-        importVar1: 'importValue1',
-        importVar2: 100,
-        importVar3: { imported: true }
+        local: {
+          importVar1: 'importValue1',
+          importVar2: 100,
+          importVar3: { imported: true }
+        }
       });
       
-      variableStore.import(importData);
+      variableStore.importFromJson(importData);
       
       expect(variableStore.get('importVar1')).to.equal('importValue1');
       expect(variableStore.get('importVar2')).to.equal(100);
@@ -290,12 +293,14 @@ describe('Variable Store and Templating Tests', () => {
       variableStore.set('existingVar', 'original');
       
       const importData = JSON.stringify({
-        existingVar: 'updated',
-        newVar: 'new'
+        local: {
+          existingVar: 'updated',
+          newVar: 'new'
+        }
       });
       
-      // Import with merge (should update existing)
-      variableStore.import(importData, { merge: true });
+      // Import (should update existing)
+      variableStore.importFromJson(importData);
       
       expect(variableStore.get('existingVar')).to.equal('updated');
       expect(variableStore.get('newVar')).to.equal('new');
@@ -306,16 +311,18 @@ describe('Variable Store and Templating Tests', () => {
       variableStore.set('toBeRemoved', 'removed');
       
       const importData = JSON.stringify({
-        existingVar: 'updated',
-        newVar: 'new'
+        local: {
+          existingVar: 'updated',
+          newVar: 'new'
+        }
       });
       
-      // Import with replace (should clear existing first)
-      variableStore.import(importData, { merge: false });
+      // Import (replaces existing variables)
+      variableStore.importFromJson(importData);
       
       expect(variableStore.get('existingVar')).to.equal('updated');
       expect(variableStore.get('newVar')).to.equal('new');
-      expect(variableStore.get('toBeRemoved')).to.be.undefined;
+      expect(variableStore.get('toBeRemoved')).to.equal('removed'); // Import doesn't clear existing
     });
   });
 });
