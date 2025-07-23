@@ -1,0 +1,455 @@
+/**
+ * SQLite Database Adapter for RestifiedTS
+ * 
+ * Provides SQLite-specific database connectivity and operations using sqlite3 driver.
+ * Perfect for testing and development environments.
+ */
+
+import { 
+  DatabaseAdapter, 
+  DatabaseConfig, 
+  DatabaseConnection, 
+  ConnectionPool, 
+  QueryBuilder,
+  MigrationManager,
+  DatabaseTestUtilities,
+  QueryField
+} from '../DatabaseTypes';
+
+import { SQLiteConnection } from './connections/SQLiteConnection';
+import { SQLiteConnectionPool } from './connections/SQLiteConnectionPool';
+import { SQLiteQueryBuilder } from './builders/SQLiteQueryBuilder';
+import { SQLiteMigrationManager } from './migrations/SQLiteMigrationManager';
+import { SQLiteTestUtilities } from './testing/SQLiteTestUtilities';
+
+export class SQLiteAdapter implements DatabaseAdapter {
+  
+  /**
+   * Create a new SQLite connection
+   */
+  async connect(config: DatabaseConfig): Promise<DatabaseConnection> {
+    if (config.type !== 'sqlite') {
+      throw new Error('Invalid database type for SQLite adapter');
+    }
+
+    const connection = new SQLiteConnection(config);
+    await connection.connect();
+    return connection;
+  }
+
+  /**
+   * Create a SQLite connection pool (SQLite typically uses single connection)
+   */
+  async createConnectionPool(config: DatabaseConfig): Promise<ConnectionPool> {
+    if (config.type !== 'sqlite') {
+      throw new Error('Invalid database type for SQLite adapter');
+    }
+
+    const pool = new SQLiteConnectionPool(config);
+    await pool.initialize();
+    return pool;
+  }
+
+  /**
+   * Create a SQLite query builder
+   */
+  createQueryBuilder(): QueryBuilder {
+    return new SQLiteQueryBuilder();
+  }
+
+  /**
+   * Create a SQLite migration manager
+   */
+  createMigrationManager(): MigrationManager {
+    return new SQLiteMigrationManager();
+  }
+
+  /**
+   * Create SQLite test utilities
+   */
+  createTestUtilities(): DatabaseTestUtilities {
+    return new SQLiteTestUtilities();
+  }
+
+  /**
+   * Escape SQLite identifier (table name, column name, etc.)
+   */
+  escapeIdentifier(identifier: string): string {
+    return `"${identifier.replace(/"/g, '""')}"`;
+  }
+
+  /**
+   * Escape SQLite value
+   */
+  escapeValue(value: any): string {
+    if (value === null || value === undefined) {
+      return 'NULL';
+    }
+    
+    if (typeof value === 'string') {
+      return `'${value.replace(/'/g, "''")}'`;
+    }
+    
+    if (typeof value === 'number') {
+      return value.toString();
+    }
+    
+    if (typeof value === 'boolean') {
+      return value ? '1' : '0';
+    }
+    
+    if (value instanceof Date) {
+      return `'${value.toISOString()}'`;
+    }
+    
+    if (Array.isArray(value)) {
+      return `'${JSON.stringify(value).replace(/'/g, "''")}'`;
+    }
+    
+    return `'${JSON.stringify(value).replace(/'/g, "''")}'`;
+  }
+
+  /**
+   * Build SQLite LIMIT clause
+   */
+  buildLimitClause(limit?: number, offset?: number): string {
+    let clause = '';
+    
+    if (limit) {
+      clause += `LIMIT ${limit}`;
+    }
+    
+    if (offset) {
+      clause += ` OFFSET ${offset}`;
+    }
+    
+    return clause.trim();
+  }
+
+  /**
+   * Get current timestamp in SQLite format
+   */
+  getCurrentTimestamp(): string {
+    return "datetime('now')";
+  }
+
+  /**
+   * Check if table exists
+   */
+  async tableExists(connection: DatabaseConnection, tableName: string): Promise<boolean> {
+    const result = await connection.query(`
+      SELECT COUNT(*) as count 
+      FROM sqlite_master 
+      WHERE type = 'table' 
+      AND name = ?
+    `, [tableName]);
+    
+    return result[0]?.count > 0;
+  }
+
+  /**
+   * Get table columns information
+   */
+  async getTableColumns(connection: DatabaseConnection, tableName: string): Promise<QueryField[]> {
+    const result = await connection.query(`PRAGMA table_info(${this.escapeIdentifier(tableName)})`);
+
+    return result.map((row: any) => ({
+      name: row.name,
+      type: row.type,
+      nullable: !row.notnull,
+      primaryKey: !!row.pk,
+      autoIncrement: row.type.toUpperCase().includes('INTEGER') && !!row.pk
+    }));
+  }
+
+  /**
+   * Get table indexes
+   */
+  async getTableIndexes(connection: DatabaseConnection, tableName: string): Promise<string[]> {
+    const result = await connection.query(`PRAGMA index_list(${this.escapeIdentifier(tableName)})`);
+    return result.map((row: any) => row.name);
+  }
+
+  /**
+   * Get SQLite version
+   */
+  async getServerVersion(connection: DatabaseConnection): Promise<string> {
+    const result = await connection.query('SELECT sqlite_version() as version');
+    return result[0]?.version || 'Unknown';
+  }
+
+  /**
+   * Get database size in bytes (file size for SQLite)
+   */
+  async getDatabaseSize(connection: DatabaseConnection): Promise<number> {
+    const result = await connection.query('PRAGMA page_count');
+    const pageCount = result[0]?.page_count || 0;
+    
+    const pageSizeResult = await connection.query('PRAGMA page_size');
+    const pageSize = pageSizeResult[0]?.page_size || 4096;
+    
+    return pageCount * pageSize;
+  }
+
+  /**
+   * Get table row count
+   */
+  async getTableRowCount(connection: DatabaseConnection, tableName: string): Promise<number> {
+    const result = await connection.query(`SELECT COUNT(*) as count FROM ${this.escapeIdentifier(tableName)}`);
+    return parseInt(result[0]?.count || '0');
+  }
+
+  /**
+   * Vacuum database to reclaim unused space
+   */
+  async vacuumDatabase(connection: DatabaseConnection): Promise<void> {
+    await connection.query('VACUUM');
+  }
+
+  /**
+   * Analyze database for query optimization
+   */
+  async analyzeDatabase(connection: DatabaseConnection): Promise<void> {
+    await connection.query('ANALYZE');
+  }
+
+  /**
+   * Get database schema
+   */
+  async getDatabaseSchema(connection: DatabaseConnection): Promise<any[]> {
+    return await connection.query(`
+      SELECT 
+        type,
+        name,
+        tbl_name,
+        sql
+      FROM sqlite_master 
+      WHERE sql NOT NULL
+      ORDER BY type, name
+    `);
+  }
+
+  /**
+   * Get table schema
+   */
+  async getTableSchema(connection: DatabaseConnection, tableName: string): Promise<string> {
+    const result = await connection.query(`
+      SELECT sql 
+      FROM sqlite_master 
+      WHERE type = 'table' 
+      AND name = ?
+    `, [tableName]);
+    
+    return result[0]?.sql || '';
+  }
+
+  /**
+   * Create index
+   */
+  async createIndex(
+    connection: DatabaseConnection, 
+    indexName: string, 
+    tableName: string, 
+    columns: string[],
+    unique: boolean = false
+  ): Promise<void> {
+    const uniqueClause = unique ? 'UNIQUE ' : '';
+    const columnList = columns.map(col => this.escapeIdentifier(col)).join(', ');
+    
+    await connection.query(`
+      CREATE ${uniqueClause}INDEX ${this.escapeIdentifier(indexName)} 
+      ON ${this.escapeIdentifier(tableName)} (${columnList})
+    `);
+  }
+
+  /**
+   * Drop index
+   */
+  async dropIndex(connection: DatabaseConnection, indexName: string): Promise<void> {
+    await connection.query(`DROP INDEX IF EXISTS ${this.escapeIdentifier(indexName)}`);
+  }
+
+  /**
+   * Enable foreign key constraints
+   */
+  async enableForeignKeys(connection: DatabaseConnection): Promise<void> {
+    await connection.query('PRAGMA foreign_keys = ON');
+  }
+
+  /**
+   * Disable foreign key constraints
+   */
+  async disableForeignKeys(connection: DatabaseConnection): Promise<void> {
+    await connection.query('PRAGMA foreign_keys = OFF');
+  }
+
+  /**
+   * Check foreign key constraints
+   */
+  async checkForeignKeys(connection: DatabaseConnection, tableName?: string): Promise<any[]> {
+    if (tableName) {
+      return await connection.query(`PRAGMA foreign_key_check(${this.escapeIdentifier(tableName)})`);
+    } else {
+      return await connection.query('PRAGMA foreign_key_check');
+    }
+  }
+
+  /**
+   * Get foreign key list for table
+   */
+  async getForeignKeys(connection: DatabaseConnection, tableName: string): Promise<any[]> {
+    return await connection.query(`PRAGMA foreign_key_list(${this.escapeIdentifier(tableName)})`);
+  }
+
+  /**
+   * Set database journal mode
+   */
+  async setJournalMode(connection: DatabaseConnection, mode: 'DELETE' | 'TRUNCATE' | 'PERSIST' | 'MEMORY' | 'WAL' | 'OFF'): Promise<void> {
+    await connection.query(`PRAGMA journal_mode = ${mode}`);
+  }
+
+  /**
+   * Get database journal mode
+   */
+  async getJournalMode(connection: DatabaseConnection): Promise<string> {
+    const result = await connection.query('PRAGMA journal_mode');
+    return result[0]?.journal_mode || 'DELETE';
+  }
+
+  /**
+   * Set synchronous mode
+   */
+  async setSynchronousMode(connection: DatabaseConnection, mode: 'OFF' | 'NORMAL' | 'FULL' | 'EXTRA'): Promise<void> {
+    await connection.query(`PRAGMA synchronous = ${mode}`);
+  }
+
+  /**
+   * Get synchronous mode
+   */
+  async getSynchronousMode(connection: DatabaseConnection): Promise<string> {
+    const result = await connection.query('PRAGMA synchronous');
+    const modeMap: { [key: number]: string } = {
+      0: 'OFF',
+      1: 'NORMAL', 
+      2: 'FULL',
+      3: 'EXTRA'
+    };
+    return modeMap[result[0]?.synchronous] || 'FULL';
+  }
+
+  /**
+   * Set cache size
+   */
+  async setCacheSize(connection: DatabaseConnection, size: number): Promise<void> {
+    await connection.query(`PRAGMA cache_size = ${size}`);
+  }
+
+  /**
+   * Get cache size
+   */
+  async getCacheSize(connection: DatabaseConnection): Promise<number> {
+    const result = await connection.query('PRAGMA cache_size');
+    return result[0]?.cache_size || 2000;
+  }
+
+  /**
+   * Set temporary store mode
+   */
+  async setTempStore(connection: DatabaseConnection, mode: 'DEFAULT' | 'FILE' | 'MEMORY'): Promise<void> {
+    const modeMap: { [key: string]: number } = {
+      'DEFAULT': 0,
+      'FILE': 1,
+      'MEMORY': 2
+    };
+    await connection.query(`PRAGMA temp_store = ${modeMap[mode]}`);
+  }
+
+  /**
+   * Get database integrity check
+   */
+  async integrityCheck(connection: DatabaseConnection): Promise<any[]> {
+    return await connection.query('PRAGMA integrity_check');
+  }
+
+  /**
+   * Quick integrity check
+   */
+  async quickCheck(connection: DatabaseConnection): Promise<any[]> {
+    return await connection.query('PRAGMA quick_check');
+  }
+
+  /**
+   * Get database statistics
+   */
+  async getDatabaseStatistics(connection: DatabaseConnection): Promise<any> {
+    const pageCount = await connection.query('PRAGMA page_count');
+    const pageSize = await connection.query('PRAGMA page_size');
+    const freeListCount = await connection.query('PRAGMA freelist_count');
+    const schemaVersion = await connection.query('PRAGMA schema_version');
+    const userVersion = await connection.query('PRAGMA user_version');
+
+    return {
+      pageCount: pageCount[0]?.page_count || 0,
+      pageSize: pageSize[0]?.page_size || 0,
+      freeListCount: freeListCount[0]?.freelist_count || 0,
+      schemaVersion: schemaVersion[0]?.schema_version || 0,
+      userVersion: userVersion[0]?.user_version || 0,
+      databaseSize: (pageCount[0]?.page_count || 0) * (pageSize[0]?.page_size || 0)
+    };
+  }
+
+  /**
+   * Backup database to file
+   */
+  async backupDatabase(connection: DatabaseConnection, backupPath: string): Promise<void> {
+    // This is a simplified backup - in real implementation, 
+    // you'd use SQLite's backup API through the sqlite3 driver
+    await connection.query(`VACUUM INTO '${backupPath.replace(/'/g, "''")}'`);
+  }
+
+  /**
+   * Attach another database
+   */
+  async attachDatabase(connection: DatabaseConnection, filePath: string, alias: string): Promise<void> {
+    await connection.query(`ATTACH DATABASE '${filePath.replace(/'/g, "''")}' AS ${this.escapeIdentifier(alias)}`);
+  }
+
+  /**
+   * Detach database
+   */
+  async detachDatabase(connection: DatabaseConnection, alias: string): Promise<void> {
+    await connection.query(`DETACH DATABASE ${this.escapeIdentifier(alias)}`);
+  }
+
+  /**
+   * Get attached databases
+   */
+  async getAttachedDatabases(connection: DatabaseConnection): Promise<any[]> {
+    return await connection.query('PRAGMA database_list');
+  }
+
+  /**
+   * Enable write-ahead logging (WAL) mode
+   */
+  async enableWAL(connection: DatabaseConnection): Promise<void> {
+    await this.setJournalMode(connection, 'WAL');
+  }
+
+  /**
+   * Checkpoint WAL file
+   */
+  async checkpointWAL(connection: DatabaseConnection, mode: 'PASSIVE' | 'FULL' | 'RESTART' | 'TRUNCATE' = 'PASSIVE'): Promise<any> {
+    const result = await connection.query(`PRAGMA wal_checkpoint(${mode})`);
+    return result[0];
+  }
+
+  /**
+   * Get WAL information
+   */
+  async getWALInfo(connection: DatabaseConnection): Promise<any> {
+    const result = await connection.query('PRAGMA wal_autocheckpoint');
+    return {
+      autoCheckpoint: result[0]?.wal_autocheckpoint || 1000
+    };
+  }
+}

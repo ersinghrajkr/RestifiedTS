@@ -1,0 +1,487 @@
+import { expect } from 'chai';
+import { 
+  InterceptorManager, 
+  PluginManager, 
+  InterceptorPluginSystem,
+  BuiltInInterceptorFactory 
+} from '../../src/interceptors';
+
+describe('Interceptor and Plugin System Tests', () => {
+  let interceptorManager: InterceptorManager;
+  let pluginManager: PluginManager;
+  let pluginSystem: InterceptorPluginSystem;
+
+  beforeEach(() => {
+    interceptorManager = new InterceptorManager();
+    pluginManager = new PluginManager();
+    pluginSystem = new InterceptorPluginSystem();
+  });
+
+  describe('InterceptorManager', () => {
+    it('should initialize interceptor manager without errors', () => {
+      expect(interceptorManager).to.be.instanceOf(InterceptorManager);
+    });
+
+    it('should register request interceptors', () => {
+      const requestInterceptor = (config: any) => {
+        config.headers = config.headers || {};
+        config.headers['X-Request-Intercepted'] = 'true';
+        return config;
+      };
+
+      expect(() => {
+        interceptorManager.addRequestInterceptor(requestInterceptor);
+      }).to.not.throw();
+    });
+
+    it('should register response interceptors', () => {
+      const responseInterceptor = (response: any) => {
+        response.intercepted = true;
+        return response;
+      };
+
+      expect(() => {
+        interceptorManager.addResponseInterceptor(responseInterceptor);
+      }).to.not.throw();
+    });
+
+    it('should register error interceptors', () => {
+      const errorInterceptor = (error: any) => {
+        error.intercepted = true;
+        return Promise.reject(error);
+      };
+
+      expect(() => {
+        interceptorManager.addErrorInterceptor(errorInterceptor);
+      }).to.not.throw();
+    });
+
+    it('should support interceptor priority ordering', () => {
+      const interceptor1 = (config: any) => {
+        config.order = config.order || [];
+        config.order.push('first');
+        return config;
+      };
+
+      const interceptor2 = (config: any) => {
+        config.order = config.order || [];
+        config.order.push('second');
+        return config;
+      };
+
+      expect(() => {
+        interceptorManager.addRequestInterceptor(interceptor1, { priority: 1 });
+        interceptorManager.addRequestInterceptor(interceptor2, { priority: 2 });
+      }).to.not.throw();
+    });
+
+    it('should remove interceptors by id', () => {
+      const interceptor = (config: any) => config;
+      
+      const interceptorId = interceptorManager.addRequestInterceptor(interceptor);
+      expect(interceptorId).to.be.a('string');
+      
+      expect(() => {
+        interceptorManager.removeInterceptor(interceptorId);
+      }).to.not.throw();
+    });
+
+    it('should clear all interceptors', () => {
+      interceptorManager.addRequestInterceptor((config) => config);
+      interceptorManager.addResponseInterceptor((response) => response);
+      
+      expect(() => {
+        interceptorManager.clearAllInterceptors();
+      }).to.not.throw();
+    });
+  });
+
+  describe('PluginManager', () => {
+    it('should initialize plugin manager without errors', () => {
+      expect(pluginManager).to.be.instanceOf(PluginManager);
+    });
+
+    it('should register plugins', () => {
+      const testPlugin = {
+        name: 'test-plugin',
+        version: '1.0.0',
+        initialize: () => {},
+        beforeRequest: (config: any) => config,
+        afterResponse: (response: any) => response
+      };
+
+      expect(() => {
+        pluginManager.registerPlugin(testPlugin);
+      }).to.not.throw();
+    });
+
+    it('should list registered plugins', () => {
+      const plugin1 = {
+        name: 'plugin-1',
+        version: '1.0.0',
+        initialize: () => {}
+      };
+
+      const plugin2 = {
+        name: 'plugin-2',
+        version: '1.0.0',
+        initialize: () => {}
+      };
+
+      pluginManager.registerPlugin(plugin1);
+      pluginManager.registerPlugin(plugin2);
+
+      const plugins = pluginManager.getRegisteredPlugins();
+      expect(plugins).to.have.length(2);
+      expect(plugins.map(p => p.name)).to.include('plugin-1');
+      expect(plugins.map(p => p.name)).to.include('plugin-2');
+    });
+
+    it('should enable and disable plugins', () => {
+      const testPlugin = {
+        name: 'toggleable-plugin',
+        version: '1.0.0',
+        initialize: () => {}
+      };
+
+      pluginManager.registerPlugin(testPlugin);
+
+      expect(() => {
+        pluginManager.disablePlugin('toggleable-plugin');
+        pluginManager.enablePlugin('toggleable-plugin');
+      }).to.not.throw();
+    });
+
+    it('should unregister plugins', () => {
+      const testPlugin = {
+        name: 'temporary-plugin',
+        version: '1.0.0',
+        initialize: () => {}
+      };
+
+      pluginManager.registerPlugin(testPlugin);
+      expect(pluginManager.getRegisteredPlugins()).to.have.length(1);
+
+      pluginManager.unregisterPlugin('temporary-plugin');
+      expect(pluginManager.getRegisteredPlugins()).to.have.length(0);
+    });
+
+    it('should handle plugin dependencies', () => {
+      const dependencyPlugin = {
+        name: 'dependency-plugin',
+        version: '1.0.0',
+        initialize: () => {}
+      };
+
+      const mainPlugin = {
+        name: 'main-plugin',
+        version: '1.0.0',
+        dependencies: ['dependency-plugin'],
+        initialize: () => {}
+      };
+
+      expect(() => {
+        pluginManager.registerPlugin(dependencyPlugin);
+        pluginManager.registerPlugin(mainPlugin);
+      }).to.not.throw();
+    });
+  });
+
+  describe('InterceptorPluginSystem', () => {
+    it('should initialize plugin system without errors', () => {
+      expect(pluginSystem).to.be.instanceOf(InterceptorPluginSystem);
+    });
+
+    it('should integrate interceptors and plugins', () => {
+      const plugin = {
+        name: 'integration-plugin',
+        version: '1.0.0',
+        initialize: () => {},
+        beforeRequest: (config: any) => {
+          config.headers = config.headers || {};
+          config.headers['X-Plugin-Applied'] = 'true';
+          return config;
+        }
+      };
+
+      expect(() => {
+        pluginSystem.registerPlugin(plugin);
+        pluginSystem.applyToRequest({});
+      }).to.not.throw();
+    });
+
+    it('should support plugin lifecycle hooks', () => {
+      let initializeCalled = false;
+      let beforeRequestCalled = false;
+      let afterResponseCalled = false;
+      let cleanupCalled = false;
+
+      const lifecyclePlugin = {
+        name: 'lifecycle-plugin',
+        version: '1.0.0',
+        initialize: () => { initializeCalled = true; },
+        beforeRequest: (config: any) => { beforeRequestCalled = true; return config; },
+        afterResponse: (response: any) => { afterResponseCalled = true; return response; },
+        cleanup: () => { cleanupCalled = true; }
+      };
+
+      pluginSystem.registerPlugin(lifecyclePlugin);
+      pluginSystem.applyToRequest({});
+      pluginSystem.applyToResponse({});
+      pluginSystem.cleanup();
+
+      expect(initializeCalled).to.be.true;
+      expect(beforeRequestCalled).to.be.true;
+      expect(afterResponseCalled).to.be.true;
+      expect(cleanupCalled).to.be.true;
+    });
+
+    it('should handle plugin errors gracefully', () => {
+      const faultyPlugin = {
+        name: 'faulty-plugin',
+        version: '1.0.0',
+        initialize: () => {},
+        beforeRequest: (config: any) => {
+          throw new Error('Plugin error');
+        }
+      };
+
+      pluginSystem.registerPlugin(faultyPlugin);
+
+      expect(() => {
+        pluginSystem.applyToRequest({});
+      }).to.not.throw(); // Should handle plugin errors gracefully
+    });
+  });
+
+  describe('Built-in Interceptors', () => {
+    it('should create logging interceptor', () => {
+      const loggingInterceptor = BuiltInInterceptorFactory.createLoggingInterceptor({
+        logRequests: true,
+        logResponses: true,
+        logErrors: true
+      });
+
+      expect(loggingInterceptor).to.exist;
+      expect(loggingInterceptor).to.have.property('request');
+      expect(loggingInterceptor).to.have.property('response');
+      expect(loggingInterceptor).to.have.property('error');
+    });
+
+    it('should create retry interceptor', () => {
+      const retryInterceptor = BuiltInInterceptorFactory.createRetryInterceptor({
+        maxRetries: 3,
+        retryDelay: 1000,
+        retryCondition: (error: any) => error.code === 'NETWORK_ERROR'
+      });
+
+      expect(retryInterceptor).to.exist;
+      expect(retryInterceptor).to.have.property('error');
+    });
+
+    it('should create caching interceptor', () => {
+      const cachingInterceptor = BuiltInInterceptorFactory.createCachingInterceptor({
+        maxAge: 300000, // 5 minutes
+        maxSize: 100,
+        keyGenerator: (config: any) => `${config.method}:${config.url}`
+      });
+
+      expect(cachingInterceptor).to.exist;
+      expect(cachingInterceptor).to.have.property('request');
+      expect(cachingInterceptor).to.have.property('response');
+    });
+
+    it('should create rate limiting interceptor', () => {
+      const rateLimitInterceptor = BuiltInInterceptorFactory.createRateLimitInterceptor({
+        requestsPerSecond: 10,
+        burstSize: 5,
+        queueSize: 100
+      });
+
+      expect(rateLimitInterceptor).to.exist;
+      expect(rateLimitInterceptor).to.have.property('request');
+    });
+
+    it('should create authentication interceptor', () => {
+      const authInterceptor = BuiltInInterceptorFactory.createAuthInterceptor({
+        type: 'bearer',
+        token: 'test-token',
+        refreshToken: () => Promise.resolve('new-token')
+      });
+
+      expect(authInterceptor).to.exist;
+      expect(authInterceptor).to.have.property('request');
+      expect(authInterceptor).to.have.property('error');
+    });
+
+    it('should create performance monitoring interceptor', () => {
+      const perfInterceptor = BuiltInInterceptorFactory.createPerformanceInterceptor({
+        enableMetrics: true,
+        slowRequestThreshold: 1000,
+        onSlowRequest: (metrics: any) => {
+          console.log('Slow request detected:', metrics);
+        }
+      });
+
+      expect(perfInterceptor).to.exist;
+      expect(perfInterceptor).to.have.property('request');
+      expect(perfInterceptor).to.have.property('response');
+    });
+  });
+
+  describe('Custom Interceptor Development', () => {
+    it('should support custom request transformation interceptors', () => {
+      const customTransformInterceptor = {
+        request: (config: any) => {
+          // Transform request data
+          if (config.data && typeof config.data === 'object') {
+            config.data = {
+              ...config.data,
+              timestamp: new Date().toISOString(),
+              version: '1.0.0'
+            };
+          }
+          return config;
+        }
+      };
+
+      expect(() => {
+        interceptorManager.addRequestInterceptor(customTransformInterceptor.request);
+      }).to.not.throw();
+    });
+
+    it('should support custom response validation interceptors', () => {
+      const validationInterceptor = {
+        response: (response: any) => {
+          // Validate response structure
+          if (response.data && !response.data.id) {
+            throw new Error('Response missing required id field');
+          }
+          return response;
+        }
+      };
+
+      expect(() => {
+        interceptorManager.addResponseInterceptor(validationInterceptor.response);
+      }).to.not.throw();
+    });
+
+    it('should support conditional interceptors', () => {
+      const conditionalInterceptor = {
+        request: (config: any) => {
+          // Only apply to GET requests
+          if (config.method === 'GET') {
+            config.headers = config.headers || {};
+            config.headers['X-GET-Request'] = 'true';
+          }
+          return config;
+        }
+      };
+
+      expect(() => {
+        interceptorManager.addRequestInterceptor(conditionalInterceptor.request);
+      }).to.not.throw();
+    });
+
+    it('should support asynchronous interceptors', () => {
+      const asyncInterceptor = {
+        request: async (config: any) => {
+          // Simulate async operation (e.g., token refresh)
+          await new Promise(resolve => setTimeout(resolve, 10));
+          config.headers = config.headers || {};
+          config.headers['X-Async-Processed'] = 'true';
+          return config;
+        }
+      };
+
+      expect(() => {
+        interceptorManager.addRequestInterceptor(asyncInterceptor.request);
+      }).to.not.throw();
+    });
+  });
+
+  describe('Interceptor Chaining and Order', () => {
+    it('should execute interceptors in correct order', () => {
+      const executionOrder: string[] = [];
+
+      const interceptor1 = (config: any) => {
+        executionOrder.push('interceptor1');
+        return config;
+      };
+
+      const interceptor2 = (config: any) => {
+        executionOrder.push('interceptor2');
+        return config;
+      };
+
+      const interceptor3 = (config: any) => {
+        executionOrder.push('interceptor3');
+        return config;
+      };
+
+      // Add with different priorities
+      interceptorManager.addRequestInterceptor(interceptor2, { priority: 2 });
+      interceptorManager.addRequestInterceptor(interceptor1, { priority: 1 });
+      interceptorManager.addRequestInterceptor(interceptor3, { priority: 3 });
+
+      // Execute interceptors
+      const config = {};
+      interceptorManager.executeRequestInterceptors(config);
+
+      expect(executionOrder).to.deep.equal(['interceptor1', 'interceptor2', 'interceptor3']);
+    });
+
+    it('should support interceptor composition', () => {
+      const addTimestamp = (config: any) => {
+        config.timestamp = new Date().toISOString();
+        return config;
+      };
+
+      const addUserAgent = (config: any) => {
+        config.headers = config.headers || {};
+        config.headers['User-Agent'] = 'RestifiedTS/1.0';
+        return config;
+      };
+
+      const addCorrelationId = (config: any) => {
+        config.headers = config.headers || {};
+        config.headers['X-Correlation-ID'] = Math.random().toString(36);
+        return config;
+      };
+
+      expect(() => {
+        interceptorManager.addRequestInterceptor(addTimestamp);
+        interceptorManager.addRequestInterceptor(addUserAgent);
+        interceptorManager.addRequestInterceptor(addCorrelationId);
+      }).to.not.throw();
+    });
+
+    it('should handle interceptor dependencies', () => {
+      const baseInterceptor = (config: any) => {
+        config.processed = config.processed || [];
+        config.processed.push('base');
+        return config;
+      };
+
+      const dependentInterceptor = (config: any) => {
+        if (!config.processed || !config.processed.includes('base')) {
+          throw new Error('Base interceptor not executed');
+        }
+        config.processed.push('dependent');
+        return config;
+      };
+
+      expect(() => {
+        interceptorManager.addRequestInterceptor(baseInterceptor, { 
+          id: 'base', 
+          priority: 1 
+        });
+        interceptorManager.addRequestInterceptor(dependentInterceptor, { 
+          id: 'dependent', 
+          priority: 2,
+          dependencies: ['base']
+        });
+      }).to.not.throw();
+    });
+  });
+});

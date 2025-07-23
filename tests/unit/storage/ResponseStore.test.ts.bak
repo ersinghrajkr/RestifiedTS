@@ -1,0 +1,396 @@
+import { expect } from 'chai';
+import { ResponseStore } from '../../../src/core/stores/ResponseStore';
+
+describe('ResponseStore System Tests', () => {
+  let responseStore: ResponseStore;
+
+  beforeEach(() => {
+    responseStore = new ResponseStore();
+  });
+
+  describe('Basic Response Storage', () => {
+    it('should create ResponseStore instance', () => {
+      expect(responseStore).to.be.instanceOf(ResponseStore);
+    });
+
+    it('should store and retrieve HTTP responses', () => {
+      const mockResponse = {
+        status: 200,
+        statusText: 'OK',
+        headers: { 'content-type': 'application/json' },
+        data: { message: 'success' },
+        config: {},
+        request: {}
+      };
+
+      responseStore.store('test-request', mockResponse as any);
+      const retrieved = responseStore.get('test-request');
+      
+      expect(retrieved).to.deep.equal(mockResponse);
+    });
+
+    it('should handle different response types', () => {
+      const jsonResponse = {
+        status: 200,
+        data: { type: 'json', users: [] },
+        headers: { 'content-type': 'application/json' }
+      };
+
+      const xmlResponse = {
+        status: 200,
+        data: '<users></users>',
+        headers: { 'content-type': 'application/xml' }
+      };
+
+      const textResponse = {
+        status: 200,
+        data: 'plain text response',
+        headers: { 'content-type': 'text/plain' }
+      };
+
+      responseStore.store('json-response', jsonResponse as any);
+      responseStore.store('xml-response', xmlResponse as any);
+      responseStore.store('text-response', textResponse as any);
+
+      expect(responseStore.get('json-response').data.type).to.equal('json');
+      expect(responseStore.get('xml-response').data).to.equal('<users></users>');
+      expect(responseStore.get('text-response').data).to.equal('plain text response');
+    });
+  });
+
+  describe('Response Querying and Filtering', () => {
+    beforeEach(() => {
+      // Store multiple responses for testing
+      responseStore.store('users-get', {
+        status: 200,
+        data: { users: [{ id: 1, name: 'John' }] },
+        headers: { 'content-type': 'application/json' }
+      } as any);
+
+      responseStore.store('users-post', {
+        status: 201,
+        data: { id: 2, name: 'Jane' },
+        headers: { 'content-type': 'application/json' }
+      } as any);
+
+      responseStore.store('error-response', {
+        status: 404,
+        data: { error: 'Not found' },
+        headers: { 'content-type': 'application/json' }
+      } as any);
+    });
+
+    it('should find responses by status code', () => {
+      const successResponses = responseStore.findByStatus(200);
+      const createdResponses = responseStore.findByStatus(201);
+      const errorResponses = responseStore.findByStatus(404);
+
+      expect(successResponses).to.have.length(1);
+      expect(createdResponses).to.have.length(1);
+      expect(errorResponses).to.have.length(1);
+    });
+
+    it('should find responses by status range', () => {
+      const successResponses = responseStore.findByStatusRange(200, 299);
+      const errorResponses = responseStore.findByStatusRange(400, 499);
+
+      expect(successResponses).to.have.length(2); // 200 and 201
+      expect(errorResponses).to.have.length(1);   // 404
+    });
+
+    it('should find responses by content type', () => {
+      const jsonResponses = responseStore.findByContentType('application/json');
+      expect(jsonResponses).to.have.length(3);
+    });
+
+    it('should list all stored response keys', () => {
+      const keys = responseStore.getKeys();
+      expect(keys).to.include('users-get', 'users-post', 'error-response');
+      expect(keys).to.have.length(3);
+    });
+  });
+
+  describe('Response Data Extraction', () => {
+    beforeEach(() => {
+      responseStore.store('complex-response', {
+        status: 200,
+        data: {
+          users: [
+            { id: 1, name: 'John', email: 'john@example.com' },
+            { id: 2, name: 'Jane', email: 'jane@example.com' }
+          ],
+          pagination: {
+            page: 1,
+            limit: 10,
+            total: 2
+          },
+          metadata: {
+            version: '1.0',
+            timestamp: '2025-01-01T12:00:00Z'
+          }
+        },
+        headers: {
+          'content-type': 'application/json',
+          'x-request-id': 'req-123'
+        }
+      } as any);
+    });
+
+    it('should extract data using JSONPath', () => {
+      const userNames = responseStore.extractPath('complex-response', '$.data.users[*].name');
+      expect(userNames).to.deep.equal(['John', 'Jane']);
+
+      const firstUserId = responseStore.extractPath('complex-response', '$.data.users[0].id');
+      expect(firstUserId).to.equal(1);
+
+      const totalCount = responseStore.extractPath('complex-response', '$.data.pagination.total');
+      expect(totalCount).to.equal(2);
+    });
+
+    it('should extract header values', () => {
+      const contentType = responseStore.extractHeader('complex-response', 'content-type');
+      expect(contentType).to.equal('application/json');
+
+      const requestId = responseStore.extractHeader('complex-response', 'x-request-id');
+      expect(requestId).to.equal('req-123');
+    });
+
+    it('should handle missing paths gracefully', () => {
+      const missing = responseStore.extractPath('complex-response', '$.data.nonexistent');
+      expect(missing).to.be.undefined;
+
+      const missingHeader = responseStore.extractHeader('complex-response', 'nonexistent-header');
+      expect(missingHeader).to.be.undefined;
+    });
+  });
+
+  describe('Response History and Versioning', () => {
+    it('should maintain response history', () => {
+      // Store multiple versions of the same endpoint
+      responseStore.store('api-v1', {
+        status: 200,
+        data: { version: 1, users: [] }
+      } as any);
+
+      responseStore.store('api-v2', {
+        status: 200,
+        data: { version: 2, users: [], features: ['new-feature'] }
+      } as any);
+
+      const v1Response = responseStore.get('api-v1');
+      const v2Response = responseStore.get('api-v2');
+
+      expect(v1Response.data.version).to.equal(1);
+      expect(v2Response.data.version).to.equal(2);
+      expect(v2Response.data.features).to.include('new-feature');
+    });
+
+    it('should support response timestamps', () => {
+      const beforeStore = Date.now();
+      
+      responseStore.store('timestamped-response', {
+        status: 200,
+        data: { message: 'test' }
+      } as any);
+
+      const afterStore = Date.now();
+      const metadata = responseStore.getMetadata('timestamped-response');
+      
+      if (metadata && metadata.timestamp) {
+        expect(metadata.timestamp).to.be.at.least(beforeStore);
+        expect(metadata.timestamp).to.be.at.most(afterStore);
+      }
+    });
+  });
+
+  describe('Response Comparison and Validation', () => {
+    beforeEach(() => {
+      responseStore.store('baseline-response', {
+        status: 200,
+        data: {
+          users: [{ id: 1, name: 'John' }],
+          count: 1
+        }
+      } as any);
+
+      responseStore.store('current-response', {
+        status: 200,
+        data: {
+          users: [{ id: 1, name: 'John' }, { id: 2, name: 'Jane' }],
+          count: 2
+        }
+      } as any);
+    });
+
+    it('should compare response structures', () => {
+      const comparison = responseStore.compare('baseline-response', 'current-response');
+      
+      expect(comparison).to.exist;
+      expect(comparison.hasChanges).to.be.true;
+    });
+
+    it('should validate response schemas', () => {
+      const schema = {
+        type: 'object',
+        properties: {
+          users: { type: 'array' },
+          count: { type: 'number' }
+        },
+        required: ['users', 'count']
+      };
+
+      const isValid = responseStore.validateSchema('baseline-response', schema);
+      expect(isValid).to.be.true;
+    });
+  });
+
+  describe('Performance and Memory Management', () => {
+    it('should handle large responses', () => {
+      const largeData = {
+        items: Array.from({ length: 1000 }, (_, i) => ({
+          id: i,
+          name: `Item ${i}`,
+          data: `Large data content ${i}`.repeat(10)
+        }))
+      };
+
+      const largeResponse = {
+        status: 200,
+        data: largeData,
+        headers: { 'content-type': 'application/json' }
+      };
+
+      expect(() => {
+        responseStore.store('large-response', largeResponse as any);
+      }).to.not.throw();
+
+      const retrieved = responseStore.get('large-response');
+      expect(retrieved.data.items).to.have.length(1000);
+    });
+
+    it('should support response cleanup', () => {
+      responseStore.store('temp-response-1', { status: 200, data: {} } as any);
+      responseStore.store('temp-response-2', { status: 200, data: {} } as any);
+      responseStore.store('temp-response-3', { status: 200, data: {} } as any);
+
+      expect(responseStore.getKeys()).to.have.length(3);
+
+      responseStore.clear();
+      expect(responseStore.getKeys()).to.have.length(0);
+    });
+
+    it('should handle concurrent response storage', async () => {
+      const promises = [];
+
+      for (let i = 0; i < 10; i++) {
+        promises.push(Promise.resolve().then(() => {
+          responseStore.store(`concurrent-${i}`, {
+            status: 200,
+            data: { id: i }
+          } as any);
+        }));
+      }
+
+      await Promise.all(promises);
+      expect(responseStore.getKeys()).to.have.length(10);
+    });
+  });
+
+  describe('Error Handling and Edge Cases', () => {
+    it('should handle storing null responses', () => {
+      expect(() => {
+        responseStore.store('null-response', null as any);
+      }).to.not.throw();
+    });
+
+    it('should handle storing undefined responses', () => {
+      expect(() => {
+        responseStore.store('undefined-response', undefined as any);
+      }).to.not.throw();
+    });
+
+    it('should handle retrieving non-existent responses', () => {
+      const nonExistent = responseStore.get('non-existent-key');
+      expect(nonExistent).to.be.undefined;
+    });
+
+    it('should handle malformed response data', () => {
+      const malformedResponse = {
+        status: 'not-a-number',
+        data: new Set([1, 2, 3]), // Non-serializable data
+        headers: null
+      };
+
+      expect(() => {
+        responseStore.store('malformed-response', malformedResponse as any);
+      }).to.not.throw();
+    });
+
+    it('should handle circular references in response data', () => {
+      const circularData: any = { name: 'test' };
+      circularData.self = circularData;
+
+      const circularResponse = {
+        status: 200,
+        data: circularData,
+        headers: {}
+      };
+
+      expect(() => {
+        responseStore.store('circular-response', circularResponse as any);
+      }).to.not.throw();
+    });
+  });
+
+  describe('Integration Features', () => {
+    it('should integrate with variable extraction', () => {
+      responseStore.store('user-creation', {
+        status: 201,
+        data: {
+          id: 'user-12345',
+          name: 'New User',
+          token: 'auth-token-xyz'
+        },
+        headers: {
+          'location': '/users/user-12345'
+        }
+      } as any);
+
+      // Extract values that could be used as variables
+      const userId = responseStore.extractPath('user-creation', '$.data.id');
+      const authToken = responseStore.extractPath('user-creation', '$.data.token');
+      const location = responseStore.extractHeader('user-creation', 'location');
+
+      expect(userId).to.equal('user-12345');
+      expect(authToken).to.equal('auth-token-xyz');
+      expect(location).to.equal('/users/user-12345');
+    });
+
+    it('should support response chaining scenarios', () => {
+      // First request - get user list
+      responseStore.store('get-users', {
+        status: 200,
+        data: {
+          users: [{ id: 1, name: 'John' }, { id: 2, name: 'Jane' }]
+        }
+      } as any);
+
+      // Extract user ID for next request
+      const firstUserId = responseStore.extractPath('get-users', '$.data.users[0].id');
+
+      // Second request - get user details
+      responseStore.store('get-user-details', {
+        status: 200,
+        data: {
+          id: firstUserId,
+          name: 'John',
+          email: 'john@example.com',
+          profile: { age: 30, city: 'New York' }
+        }
+      } as any);
+
+      const userEmail = responseStore.extractPath('get-user-details', '$.data.email');
+      expect(userEmail).to.equal('john@example.com');
+    });
+  });
+});

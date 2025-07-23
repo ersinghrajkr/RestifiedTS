@@ -763,6 +763,98 @@ export interface TemplateContext {
 }
 
 // ==========================================
+// REPORTING TYPES
+// ==========================================
+
+export interface ReportingConfig {
+  enabled: boolean;
+  format: 'html' | 'json' | 'both';
+  outputPath: string;
+  includeSnapshots?: boolean;
+  includePerformanceMetrics?: boolean;
+  includeTrends?: boolean;
+  autoGenerate?: boolean;
+  customTemplate?: string;
+}
+
+// Duplicate AuditLogEntry interface removed - using the one defined earlier around line 455
+
+export interface TestReportData {
+  metadata: {
+    generatedAt: string;
+    totalTests: number;
+    totalDuration: number;
+    framework: string;
+    version: string;
+  };
+  summary: TestSummary;
+  testResults: TestResult[];
+  performanceMetrics: PerformanceMetrics;
+  errorAnalysis: ErrorAnalysis;
+  snapshots?: SnapshotSummary[];
+  rawData: AuditLogEntry[];
+}
+
+export interface TestSummary {
+  totalTests: number;
+  successfulTests: number;
+  failedTests: number;
+  successRate: number;
+  totalDuration: number;
+  totalRequests: number;
+  averageResponseTime: number;
+  statusCodeDistribution: Record<number, number>;
+  startTime: Date;
+  endTime: Date;
+}
+
+// Duplicate TestResult interface removed - using the one defined earlier around line 590
+
+// Duplicate PerformanceMetrics interface removed - using the one defined earlier around line 490
+
+export interface ErrorAnalysis {
+  totalErrors: number;
+  errorTypes: Record<string, number>;
+  errorsByTest: Record<string, number>;
+  commonErrors: Array<{
+    message: string;
+    count: number;
+  }>;
+}
+
+export interface SnapshotSummary {
+  key: string;
+  size: number;
+  lastModified: Date;
+  hasChanges: boolean;
+}
+
+export interface TimeSeriesPoint {
+  timestamp: Date;
+  averageResponseTime: number;
+  requestCount: number;
+  errorCount: number;
+  successRate: number;
+}
+
+export interface TrendData {
+  runs: Array<{
+    runIndex: number;
+    timestamp: Date;
+    summary: TestSummary;
+    performance: PerformanceMetrics;
+  }>;
+  trends: {
+    successRate: TrendDirection;
+    averageResponseTime: TrendDirection;
+    errorRate: TrendDirection;
+    requestsPerSecond: TrendDirection;
+  };
+}
+
+export type TrendDirection = 'increasing' | 'decreasing' | 'stable';
+
+// ==========================================
 // EXPORT TYPES
 // ==========================================
 

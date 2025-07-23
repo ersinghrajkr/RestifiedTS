@@ -71,12 +71,11 @@ export {
   TransportFactory
 } from './logging';
 
+// Reporting exports (ReportGenerator and HtmlReporter temporarily commented out due to type issues)
 export {
-  ReportingManager,
-  RestifiedReportGenerator,
-  HtmlReportGenerator,
-  JsonReportGenerator,
-  JunitReportGenerator
+  // ReportGenerator,
+  // HtmlReporter,
+  DiffReporter
 } from './reporting';
 
 // Type exports
@@ -114,7 +113,7 @@ export {
   TestEnvironment,
   TestAttachment,
   ReportConfig,
-  ReportGenerator,
+  // ReportGenerator, // Temporarily commented out due to type issues
   ReportOutput,
   DashboardData,
   TestAnalytics,

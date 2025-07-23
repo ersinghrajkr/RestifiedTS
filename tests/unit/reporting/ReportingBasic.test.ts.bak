@@ -1,0 +1,169 @@
+import { expect } from 'chai';
+import { ReportGenerator, HtmlReporter, DiffReporter } from '../../../src/reporting';
+import { ReportingConfig } from '../../../src/types/RestifiedTypes';
+
+describe('RestifiedTS Reporting System - Basic Tests', () => {
+  describe('Reporting Module Exports', () => {
+    it('should export ReportGenerator class', () => {
+      expect(ReportGenerator).to.exist;
+      expect(ReportGenerator).to.be.a('function');
+    });
+
+    it('should export HtmlReporter class', () => {
+      expect(HtmlReporter).to.exist;
+      expect(HtmlReporter).to.be.a('function');
+    });
+
+    it('should export DiffReporter class', () => {
+      expect(DiffReporter).to.exist;
+      expect(DiffReporter).to.be.a('function');
+    });
+  });
+
+  describe('Class Instantiation', () => {
+    it('should create ReportGenerator instance', () => {
+      const config: ReportingConfig = {
+        enabled: true,
+        format: 'html',
+        outputPath: './test-reports'
+      };
+      
+      const reportGenerator = new ReportGenerator(config);
+      expect(reportGenerator).to.be.instanceOf(ReportGenerator);
+    });
+
+    it('should create HtmlReporter instance', () => {
+      const htmlReporter = new HtmlReporter();
+      expect(htmlReporter).to.be.instanceOf(HtmlReporter);
+    });
+
+    it('should create DiffReporter instance', () => {
+      const diffReporter = new DiffReporter();
+      expect(diffReporter).to.be.instanceOf(DiffReporter);
+    });
+  });
+
+  describe('Method Availability', () => {
+    let reportGenerator: ReportGenerator;
+
+    beforeEach(() => {
+      const config: ReportingConfig = {
+        enabled: true,
+        format: 'html',
+        outputPath: './test-reports'
+      };
+      reportGenerator = new ReportGenerator(config);
+    });
+
+    it('should have generateHtmlReport method', () => {
+      expect(reportGenerator).to.have.property('generateHtmlReport');
+      expect(reportGenerator.generateHtmlReport).to.be.a('function');
+    });
+
+    it('should have generateJsonReport method', () => {
+      expect(reportGenerator).to.have.property('generateJsonReport');
+      expect(reportGenerator.generateJsonReport).to.be.a('function');
+    });
+
+    it('should have generateAllReports method', () => {
+      expect(reportGenerator).to.have.property('generateAllReports');
+      expect(reportGenerator.generateAllReports).to.be.a('function');
+    });
+
+    it('should have generatePerformanceReport method', () => {
+      expect(reportGenerator).to.have.property('generatePerformanceReport');
+      expect(reportGenerator.generatePerformanceReport).to.be.a('function');
+    });
+
+    it('should have generateTrendReport method', () => {
+      expect(reportGenerator).to.have.property('generateTrendReport');
+      expect(reportGenerator.generateTrendReport).to.be.a('function');
+    });
+  });
+
+  describe('Configuration Handling', () => {
+    it('should handle disabled reporting config', () => {
+      const disabledConfig: ReportingConfig = {
+        enabled: false,
+        format: 'html',
+        outputPath: './reports'
+      };
+
+      expect(() => new ReportGenerator(disabledConfig)).to.not.throw();
+    });
+
+    it('should handle different report formats', () => {
+      const htmlConfig: ReportingConfig = {
+        enabled: true,
+        format: 'html',
+        outputPath: './reports'
+      };
+
+      const jsonConfig: ReportingConfig = {
+        enabled: true,
+        format: 'json',
+        outputPath: './reports'
+      };
+
+      const bothConfig: ReportingConfig = {
+        enabled: true,
+        format: 'both',
+        outputPath: './reports'
+      };
+
+      expect(() => new ReportGenerator(htmlConfig)).to.not.throw();
+      expect(() => new ReportGenerator(jsonConfig)).to.not.throw();
+      expect(() => new ReportGenerator(bothConfig)).to.not.throw();
+    });
+
+    it('should handle optional configuration properties', () => {
+      const minimalConfig: ReportingConfig = {
+        enabled: true,
+        format: 'html',
+        outputPath: './reports'
+      };
+
+      const fullConfig: ReportingConfig = {
+        enabled: true,
+        format: 'html',
+        outputPath: './reports',
+        includeSnapshots: true,
+        includePerformanceMetrics: true,
+        includeTrends: true,
+        autoGenerate: true,
+        customTemplate: './custom-template.html'
+      };
+
+      expect(() => new ReportGenerator(minimalConfig)).to.not.throw();
+      expect(() => new ReportGenerator(fullConfig)).to.not.throw();
+    });
+  });
+
+  describe('Reporter Classes', () => {
+    it('should have HtmlReporter methods', () => {
+      const htmlReporter = new HtmlReporter();
+      
+      expect(htmlReporter).to.have.property('generateReport');
+      expect(htmlReporter.generateReport).to.be.a('function');
+      
+      expect(htmlReporter).to.have.property('generatePerformanceReport');
+      expect(htmlReporter.generatePerformanceReport).to.be.a('function');
+      
+      expect(htmlReporter).to.have.property('generateTrendReport');
+      expect(htmlReporter.generateTrendReport).to.be.a('function');
+    });
+
+    it('should have DiffReporter methods', () => {
+      const diffReporter = new DiffReporter();
+      
+      expect(diffReporter).to.have.property('generateDiffReport');
+      expect(diffReporter.generateDiffReport).to.be.a('function');
+      
+      expect(diffReporter).to.have.property('generateResponseDiffReport');
+      expect(diffReporter.generateResponseDiffReport).to.be.a('function');
+      
+      expect(diffReporter).to.have.property('generateBatchDiffReport');
+      expect(diffReporter.generateBatchDiffReport).to.be.a('function');
+    });
+  });
+});

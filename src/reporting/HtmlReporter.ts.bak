@@ -1,0 +1,829 @@
+/**
+ * HTML Reporter for RestifiedTS
+ * 
+ * Generates interactive HTML reports with charts, filtering, and detailed analysis.
+ * Provides comprehensive visualization of test results, performance metrics, and trends.
+ */
+
+import * as fs from 'fs';
+import * as path from 'path';
+import { TestReportData, PerformanceMetrics, TrendData } from '../types/RestifiedTypes';
+
+export class HtmlReporter {
+  /**
+   * Generate comprehensive HTML test report
+   */
+  async generateReport(data: TestReportData): Promise<string> {
+    const template = this.getReportTemplate();
+    
+    const html = template
+      .replace('{{TITLE}}', 'RestifiedTS Test Report')
+      .replace('{{METADATA}}', JSON.stringify(data.metadata, null, 2))
+      .replace('{{SUMMARY_SECTION}}', this.generateSummarySection(data))
+      .replace('{{TEST_RESULTS_SECTION}}', this.generateTestResultsSection(data))
+      .replace('{{PERFORMANCE_SECTION}}', this.generatePerformanceSection(data))
+      .replace('{{ERROR_ANALYSIS_SECTION}}', this.generateErrorAnalysisSection(data))
+      .replace('{{SNAPSHOTS_SECTION}}', this.generateSnapshotsSection(data))
+      .replace('{{CHARTS_DATA}}', JSON.stringify(this.prepareChartsData(data), null, 2))
+      .replace('{{RAW_DATA}}', JSON.stringify(data.rawData, null, 2));
+
+    return html;
+  }
+
+  /**
+   * Generate performance-focused HTML report
+   */
+  async generatePerformanceReport(performanceData: PerformanceMetrics): Promise<string> {
+    const template = this.getPerformanceTemplate();
+    
+    const html = template
+      .replace('{{TITLE}}', 'RestifiedTS Performance Report')
+      .replace('{{PERFORMANCE_METRICS}}', JSON.stringify(performanceData, null, 2))
+      .replace('{{PERFORMANCE_CHARTS}}', this.generatePerformanceCharts(performanceData))
+      .replace('{{PERFORMANCE_SUMMARY}}', this.generatePerformanceSummary(performanceData));
+
+    return html;
+  }
+
+  /**
+   * Generate trend analysis HTML report
+   */
+  async generateTrendReport(trendData: TrendData): Promise<string> {
+    const template = this.getTrendTemplate();
+    
+    const html = template
+      .replace('{{TITLE}}', 'RestifiedTS Trend Analysis Report')
+      .replace('{{TREND_DATA}}', JSON.stringify(trendData, null, 2))
+      .replace('{{TREND_CHARTS}}', this.generateTrendCharts(trendData))
+      .replace('{{TREND_SUMMARY}}', this.generateTrendSummary(trendData));
+
+    return html;
+  }
+
+  // ==========================================
+  // PRIVATE METHODS - SECTION GENERATORS
+  // ==========================================
+
+  private generateSummarySection(data: TestReportData): string {
+    const { summary } = data;
+    
+    return `
+    <div class="summary-section">
+      <h2>Test Execution Summary</h2>
+      <div class="summary-cards">
+        <div class="card ${summary.successRate >= 90 ? 'success' : summary.successRate >= 70 ? 'warning' : 'danger'}">
+          <h3>Success Rate</h3>
+          <div class="metric">${summary.successRate.toFixed(1)}%</div>
+          <div class="detail">${summary.successfulTests}/${summary.totalTests} tests passed</div>
+        </div>
+        
+        <div class="card">
+          <h3>Total Duration</h3>
+          <div class="metric">${(summary.totalDuration / 1000).toFixed(2)}s</div>
+          <div class="detail">${summary.totalRequests} requests</div>
+        </div>
+        
+        <div class="card">
+          <h3>Average Response</h3>
+          <div class="metric">${summary.averageResponseTime.toFixed(0)}ms</div>
+          <div class="detail">Per request</div>
+        </div>
+        
+        <div class="card ${summary.failedTests === 0 ? 'success' : 'danger'}">
+          <h3>Failed Tests</h3>
+          <div class="metric">${summary.failedTests}</div>
+          <div class="detail">Out of ${summary.totalTests}</div>
+        </div>
+      </div>
+      
+      <div class="status-distribution">
+        <h3>Status Code Distribution</h3>
+        <div class="status-codes">
+          ${Object.entries(summary.statusCodeDistribution)
+            .map(([code, count]) => `
+              <div class="status-item ${this.getStatusClass(parseInt(code))}">
+                <span class="code">${code}</span>
+                <span class="count">${count}</span>
+                <div class="bar" style="width: ${(count / summary.totalRequests) * 100}%"></div>
+              </div>
+            `).join('')}
+        </div>
+      </div>
+    </div>`;
+  }
+
+  private generateTestResultsSection(data: TestReportData): string {
+    return `
+    <div class="test-results-section">
+      <h2>Test Results Details</h2>
+      <div class="test-filter">
+        <button class="filter-btn active" data-filter="all">All Tests</button>
+        <button class="filter-btn" data-filter="passed">Passed (${data.testResults.filter(t => t.status === 'passed').length})</button>
+        <button class="filter-btn" data-filter="failed">Failed (${data.testResults.filter(t => t.status === 'failed').length})</button>
+      </div>
+      
+      <div class="test-list">
+        ${data.testResults.map(test => `
+          <div class="test-item ${test.status}" data-status="${test.status}">
+            <div class="test-header">
+              <h3 class="test-name">${test.testName}</h3>
+              <div class="test-status ${test.status}">
+                <span class="status-icon">${test.status === 'passed' ? '✓' : '✗'}</span>
+                ${test.status}
+              </div>
+            </div>
+            
+            <div class="test-metrics">
+              <span class="metric">Duration: ${test.duration.toFixed(0)}ms</span>
+              <span class="metric">Requests: ${test.requestCount}</span>
+              <span class="metric">Avg Response: ${test.averageResponseTime.toFixed(0)}ms</span>
+            </div>
+            
+            ${test.errors.length > 0 ? `
+              <div class="test-errors">
+                <h4>Errors:</h4>
+                ${test.errors.map(error => `
+                  <div class="error">
+                    <div class="error-message">${error.message}</div>
+                    ${error.stack ? `<pre class="error-stack">${error.stack}</pre>` : ''}
+                  </div>
+                `).join('')}
+              </div>
+            ` : ''}
+            
+            <div class="test-requests">
+              <h4>Requests (${test.requests.length}):</h4>
+              <div class="requests-list">
+                ${test.requests.map(req => `
+                  <div class="request-item ${this.getStatusClass(req.statusCode)}">
+                    <span class="method">${req.method}</span>
+                    <span class="url">${req.url}</span>
+                    <span class="status">${req.statusCode}</span>
+                    <span class="time">${req.responseTime.toFixed(0)}ms</span>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>`;
+  }
+
+  private generatePerformanceSection(data: TestReportData): string {
+    const { performanceMetrics: perf } = data;
+    
+    return `
+    <div class="performance-section">
+      <h2>Performance Analysis</h2>
+      
+      <div class="performance-overview">
+        <div class="perf-cards">
+          <div class="card">
+            <h3>Requests/Second</h3>
+            <div class="metric">${perf.requestsPerSecond.toFixed(2)}</div>
+          </div>
+          
+          <div class="card">
+            <h3>Error Rate</h3>
+            <div class="metric ${perf.errorRate > 5 ? 'danger' : perf.errorRate > 1 ? 'warning' : 'success'}">
+              ${perf.errorRate.toFixed(2)}%
+            </div>
+          </div>
+          
+          <div class="card">
+            <h3>P95 Response Time</h3>
+            <div class="metric">${perf.p95ResponseTime.toFixed(0)}ms</div>
+          </div>
+          
+          <div class="card">
+            <h3>P99 Response Time</h3>
+            <div class="metric">${perf.p99ResponseTime.toFixed(0)}ms</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="response-time-distribution">
+        <h3>Response Time Distribution</h3>
+        <div class="percentiles">
+          <div class="percentile-item">
+            <span class="label">Min</span>
+            <span class="value">${perf.minResponseTime.toFixed(0)}ms</span>
+          </div>
+          <div class="percentile-item">
+            <span class="label">P50</span>
+            <span class="value">${perf.p50ResponseTime.toFixed(0)}ms</span>
+          </div>
+          <div class="percentile-item">
+            <span class="label">P95</span>
+            <span class="value">${perf.p95ResponseTime.toFixed(0)}ms</span>
+          </div>
+          <div class="percentile-item">
+            <span class="label">P99</span>
+            <span class="value">${perf.p99ResponseTime.toFixed(0)}ms</span>
+          </div>
+          <div class="percentile-item">
+            <span class="label">Max</span>
+            <span class="value">${perf.maxResponseTime.toFixed(0)}ms</span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="performance-chart">
+        <canvas id="performanceChart" width="800" height="400"></canvas>
+      </div>
+    </div>`;
+  }
+
+  private generateErrorAnalysisSection(data: TestReportData): string {
+    const { errorAnalysis } = data;
+    
+    if (errorAnalysis.totalErrors === 0) {
+      return `
+      <div class="error-analysis-section">
+        <h2>Error Analysis</h2>
+        <div class="no-errors">
+          <div class="success-icon">✓</div>
+          <h3>No Errors Found!</h3>
+          <p>All tests executed successfully without errors.</p>
+        </div>
+      </div>`;
+    }
+    
+    return `
+    <div class="error-analysis-section">
+      <h2>Error Analysis</h2>
+      
+      <div class="error-summary">
+        <div class="card danger">
+          <h3>Total Errors</h3>
+          <div class="metric">${errorAnalysis.totalErrors}</div>
+        </div>
+      </div>
+      
+      <div class="error-breakdown">
+        <div class="error-types">
+          <h3>Error Types</h3>
+          ${Object.entries(errorAnalysis.errorTypes).map(([type, count]) => `
+            <div class="error-type-item">
+              <span class="type">${type}</span>
+              <span class="count">${count}</span>
+            </div>
+          `).join('')}
+        </div>
+        
+        <div class="common-errors">
+          <h3>Most Common Errors</h3>
+          ${errorAnalysis.commonErrors.map(error => `
+            <div class="common-error-item">
+              <div class="error-message">${error.message}</div>
+              <span class="error-count">${error.count}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    </div>`;
+  }
+
+  private generateSnapshotsSection(data: TestReportData): string {
+    if (!data.snapshots || data.snapshots.length === 0) {
+      return `
+      <div class="snapshots-section">
+        <h2>Snapshots</h2>
+        <p>No snapshots were captured during this test run.</p>
+      </div>`;
+    }
+    
+    return `
+    <div class="snapshots-section">
+      <h2>Snapshots</h2>
+      <div class="snapshots-list">
+        ${data.snapshots.map(snapshot => `
+          <div class="snapshot-item">
+            <h3>${snapshot.key}</h3>
+            <div class="snapshot-details">
+              <span>Size: ${(snapshot.size / 1024).toFixed(2)} KB</span>
+              <span>Modified: ${snapshot.lastModified.toLocaleString()}</span>
+              <span class="changes ${snapshot.hasChanges ? 'has-changes' : 'no-changes'}">
+                ${snapshot.hasChanges ? 'Has Changes' : 'No Changes'}
+              </span>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>`;
+  }
+
+  // ==========================================
+  // PRIVATE METHODS - CHARTS AND HELPERS
+  // ==========================================
+
+  private generatePerformanceCharts(perf: PerformanceMetrics): string {
+    return `
+    <div class="charts-container">
+      <canvas id="responseTimeChart" width="800" height="300"></canvas>
+      <canvas id="throughputChart" width="800" height="300"></canvas>
+    </div>`;
+  }
+
+  private generatePerformanceSummary(perf: PerformanceMetrics): string {
+    return `
+    <div class="performance-summary">
+      <h3>Performance Highlights</h3>
+      <ul>
+        <li>Processed ${perf.totalRequests} requests</li>
+        <li>Average response time: ${perf.averageResponseTime.toFixed(2)}ms</li>
+        <li>Throughput: ${perf.requestsPerSecond.toFixed(2)} requests/second</li>
+        <li>Error rate: ${perf.errorRate.toFixed(2)}%</li>
+      </ul>
+    </div>`;
+  }
+
+  private generateTrendCharts(trendData: TrendData): string {
+    return `
+    <div class="trend-charts">
+      <canvas id="successRateTrendChart" width="800" height="300"></canvas>
+      <canvas id="responseTimeTrendChart" width="800" height="300"></canvas>
+    </div>`;
+  }
+
+  private generateTrendSummary(trendData: TrendData): string {
+    return `
+    <div class="trend-summary">
+      <h3>Trend Analysis</h3>
+      <ul>
+        <li>Success Rate Trend: ${trendData.trends.successRate}</li>
+        <li>Response Time Trend: ${trendData.trends.averageResponseTime}</li>
+        <li>Error Rate Trend: ${trendData.trends.errorRate}</li>
+        <li>Throughput Trend: ${trendData.trends.requestsPerSecond}</li>
+      </ul>
+    </div>`;
+  }
+
+  private prepareChartsData(data: TestReportData): any {
+    return {
+      responseTimeSeries: data.performanceMetrics.timeSeriesData.map(point => ({
+        x: point.timestamp,
+        y: point.averageResponseTime
+      })),
+      successRateSeries: data.performanceMetrics.timeSeriesData.map(point => ({
+        x: point.timestamp,
+        y: point.successRate
+      })),
+      statusCodeDistribution: data.summary.statusCodeDistribution
+    };
+  }
+
+  private getStatusClass(statusCode: number): string {
+    if (statusCode >= 200 && statusCode < 300) return 'success';
+    if (statusCode >= 300 && statusCode < 400) return 'warning';
+    if (statusCode >= 400) return 'danger';
+    return 'info';
+  }
+
+  // ==========================================
+  // TEMPLATES
+  // ==========================================
+
+  private getReportTemplate(): string {
+    return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{TITLE}}</title>
+    <style>
+        ${this.getReportStyles()}
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header class="report-header">
+            <h1>{{TITLE}}</h1>
+            <div class="metadata">
+                Generated: <span id="generatedTime"></span> | 
+                Framework: RestifiedTS v1.0.0
+            </div>
+        </header>
+        
+        <main class="report-content">
+            {{SUMMARY_SECTION}}
+            {{TEST_RESULTS_SECTION}}
+            {{PERFORMANCE_SECTION}}
+            {{ERROR_ANALYSIS_SECTION}}
+            {{SNAPSHOTS_SECTION}}
+        </main>
+        
+        <footer class="report-footer">
+            <p>Generated by RestifiedTS Framework | <a href="https://github.com/ersinghrajkr/RestifiedTS">GitHub</a></p>
+        </footer>
+    </div>
+
+    <script>
+        const metadata = {{METADATA}};
+        const chartsData = {{CHARTS_DATA}};
+        const rawData = {{RAW_DATA}};
+        
+        ${this.getReportScripts()}
+    </script>
+</body>
+</html>`;
+  }
+
+  private getPerformanceTemplate(): string {
+    return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{TITLE}}</title>
+    <style>${this.getReportStyles()}</style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header class="report-header">
+            <h1>{{TITLE}}</h1>
+        </header>
+        
+        <main class="report-content">
+            {{PERFORMANCE_SUMMARY}}
+            {{PERFORMANCE_CHARTS}}
+        </main>
+    </div>
+    
+    <script>
+        const performanceMetrics = {{PERFORMANCE_METRICS}};
+        ${this.getPerformanceScripts()}
+    </script>
+</body>
+</html>`;
+  }
+
+  private getTrendTemplate(): string {
+    return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{TITLE}}</title>
+    <style>${this.getReportStyles()}</style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header class="report-header">
+            <h1>{{TITLE}}</h1>
+        </header>
+        
+        <main class="report-content">
+            {{TREND_SUMMARY}}
+            {{TREND_CHARTS}}
+        </main>
+    </div>
+    
+    <script>
+        const trendData = {{TREND_DATA}};
+        ${this.getTrendScripts()}
+    </script>
+</body>
+</html>`;
+  }
+
+  private getReportStyles(): string {
+    return `
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            min-height: 100vh;
+        }
+        
+        .report-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+        
+        .report-header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .metadata {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+        
+        .report-content {
+            padding: 2rem;
+        }
+        
+        .summary-section, .test-results-section, .performance-section, 
+        .error-analysis-section, .snapshots-section {
+            margin-bottom: 3rem;
+        }
+        
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-left: 4px solid #e0e0e0;
+        }
+        
+        .card.success { border-left-color: #4caf50; }
+        .card.warning { border-left-color: #ff9800; }
+        .card.danger { border-left-color: #f44336; }
+        
+        .card h3 {
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .metric {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 0.25rem;
+        }
+        
+        .detail {
+            font-size: 0.85rem;
+            color: #888;
+        }
+        
+        .test-filter {
+            margin-bottom: 1rem;
+        }
+        
+        .filter-btn {
+            background: #f0f0f0;
+            border: none;
+            padding: 0.5rem 1rem;
+            margin-right: 0.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .filter-btn.active, .filter-btn:hover {
+            background: #667eea;
+            color: white;
+        }
+        
+        .test-item {
+            background: white;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            border-left: 4px solid #e0e0e0;
+        }
+        
+        .test-item.passed { border-left-color: #4caf50; }
+        .test-item.failed { border-left-color: #f44336; }
+        
+        .test-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        
+        .test-name {
+            flex: 1;
+            font-size: 1.1rem;
+        }
+        
+        .test-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+        
+        .test-status.passed {
+            background: #e8f5e8;
+            color: #2e7d32;
+        }
+        
+        .test-status.failed {
+            background: #ffebee;
+            color: #c62828;
+        }
+        
+        .test-metrics {
+            display: flex;
+            gap: 1rem;
+            font-size: 0.85rem;
+            color: #666;
+            margin-bottom: 1rem;
+        }
+        
+        .error {
+            background: #ffebee;
+            border: 1px solid #ffcdd2;
+            border-radius: 4px;
+            padding: 1rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .error-message {
+            font-weight: 500;
+            color: #c62828;
+            margin-bottom: 0.5rem;
+        }
+        
+        .error-stack {
+            font-size: 0.8rem;
+            color: #666;
+            background: #f5f5f5;
+            padding: 0.5rem;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        
+        .request-item {
+            display: grid;
+            grid-template-columns: auto 1fr auto auto;
+            gap: 1rem;
+            padding: 0.5rem;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            align-items: center;
+        }
+        
+        .request-item.success { background: #e8f5e8; }
+        .request-item.warning { background: #fff3e0; }
+        .request-item.danger { background: #ffebee; }
+        
+        .method {
+            font-weight: 500;
+            padding: 0.25rem 0.5rem;
+            border-radius: 3px;
+            background: #e0e0e0;
+            font-size: 0.75rem;
+        }
+        
+        .no-errors {
+            text-align: center;
+            padding: 3rem;
+        }
+        
+        .success-icon {
+            font-size: 4rem;
+            color: #4caf50;
+            margin-bottom: 1rem;
+        }
+        
+        .report-footer {
+            background: #f5f5f5;
+            padding: 1rem;
+            text-align: center;
+            font-size: 0.85rem;
+            color: #666;
+        }
+        
+        .report-footer a {
+            color: #667eea;
+            text-decoration: none;
+        }
+        
+        .hidden { display: none; }
+        
+        @media (max-width: 768px) {
+            .summary-cards {
+                grid-template-columns: 1fr;
+            }
+            
+            .test-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.5rem;
+            }
+            
+            .test-metrics {
+                flex-direction: column;
+                gap: 0.25rem;
+            }
+        }
+    `;
+  }
+
+  private getReportScripts(): string {
+    return `
+        // Set generated time
+        document.getElementById('generatedTime').textContent = new Date(metadata.generatedAt).toLocaleString();
+        
+        // Test filtering
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const filter = this.dataset.filter;
+                
+                // Update active button
+                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                
+                // Filter test items
+                document.querySelectorAll('.test-item').forEach(item => {
+                    if (filter === 'all' || item.dataset.status === filter) {
+                        item.style.display = 'block';
+                    } else {
+                        item.style.display = 'none';
+                    }
+                });
+            });
+        });
+        
+        // Initialize charts if chart data is available
+        if (typeof chartsData !== 'undefined' && chartsData.responseTimeSeries) {
+            initializeCharts();
+        }
+        
+        function initializeCharts() {
+            // Performance timeline chart
+            const perfCanvas = document.getElementById('performanceChart');
+            if (perfCanvas) {
+                new Chart(perfCanvas, {
+                    type: 'line',
+                    data: {
+                        datasets: [{
+                            label: 'Response Time (ms)',
+                            data: chartsData.responseTimeSeries,
+                            borderColor: '#667eea',
+                            backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                            tension: 0.1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            x: {
+                                type: 'time',
+                                time: { unit: 'second' }
+                            },
+                            y: {
+                                beginAtZero: true,
+                                title: { display: true, text: 'Response Time (ms)' }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+    `;
+  }
+
+  private getPerformanceScripts(): string {
+    return `
+        // Performance-specific chart initialization
+        function initPerformanceCharts() {
+            // Implementation for performance charts
+        }
+        
+        if (typeof performanceMetrics !== 'undefined') {
+            initPerformanceCharts();
+        }
+    `;
+  }
+
+  private getTrendScripts(): string {
+    return `
+        // Trend-specific chart initialization
+        function initTrendCharts() {
+            // Implementation for trend charts
+        }
+        
+        if (typeof trendData !== 'undefined') {
+            initTrendCharts();
+        }
+    `;
+  }
+}

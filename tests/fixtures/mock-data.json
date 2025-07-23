@@ -1,0 +1,39 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "name": "John Doe",
+      "email": "john@example.com",
+      "role": "admin"
+    },
+    {
+      "id": 2,
+      "name": "Jane Smith", 
+      "email": "jane@example.com",
+      "role": "user"
+    }
+  ],
+  "posts": [
+    {
+      "id": 1,
+      "title": "Test Post",
+      "body": "This is a test post for RestifiedTS",
+      "userId": 1
+    },
+    {
+      "id": 2,
+      "title": "Another Test Post",
+      "body": "Another test post for integration testing",
+      "userId": 2
+    }
+  ],
+  "config": {
+    "apiVersion": "v1",
+    "environment": "test",
+    "features": {
+      "authentication": true,
+      "logging": true,
+      "caching": false
+    }
+  }
+}

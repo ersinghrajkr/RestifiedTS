@@ -1,0 +1,417 @@
+/**
+ * MongoDB Database Adapter for RestifiedTS
+ * 
+ * Provides MongoDB-specific database connectivity and operations using mongodb driver.
+ */
+
+import { 
+  DatabaseAdapter, 
+  DatabaseConfig, 
+  DatabaseConnection, 
+  ConnectionPool, 
+  QueryBuilder,
+  MigrationManager,
+  DatabaseTestUtilities,
+  QueryField,
+  MongoConfig,
+  MongoDocument,
+  MongoQuery,
+  MongoBulkOperation
+} from '../DatabaseTypes';
+
+import { MongoDBConnection } from './connections/MongoDBConnection';
+import { MongoDBConnectionPool } from './connections/MongoDBConnectionPool';
+import { MongoDBQueryBuilder } from './builders/MongoDBQueryBuilder';
+import { MongoDBMigrationManager } from './migrations/MongoDBMigrationManager';
+import { MongoDBTestUtilities } from './testing/MongoDBTestUtilities';
+
+export class MongoDBAdapter implements DatabaseAdapter {
+  
+  /**
+   * Create a new MongoDB connection
+   */
+  async connect(config: DatabaseConfig): Promise<DatabaseConnection> {
+    if (config.type !== 'mongodb') {
+      throw new Error('Invalid database type for MongoDB adapter');
+    }
+
+    const connection = new MongoDBConnection(config as MongoConfig);
+    await connection.connect();
+    return connection;
+  }
+
+  /**
+   * Create a MongoDB connection pool
+   */
+  async createConnectionPool(config: DatabaseConfig): Promise<ConnectionPool> {
+    if (config.type !== 'mongodb') {
+      throw new Error('Invalid database type for MongoDB adapter');
+    }
+
+    const pool = new MongoDBConnectionPool(config as MongoConfig);
+    await pool.initialize();
+    return pool;
+  }
+
+  /**
+   * Create a MongoDB query builder
+   */
+  createQueryBuilder(): QueryBuilder {
+    return new MongoDBQueryBuilder();
+  }
+
+  /**
+   * Create a MongoDB migration manager
+   */
+  createMigrationManager(): MigrationManager {
+    return new MongoDBMigrationManager();
+  }
+
+  /**
+   * Create MongoDB test utilities
+   */
+  createTestUtilities(): DatabaseTestUtilities {
+    return new MongoDBTestUtilities();
+  }
+
+  /**
+   * Escape MongoDB field name (not typically needed but provided for interface)
+   */
+  escapeIdentifier(identifier: string): string {
+    // MongoDB field names don't need escaping like SQL databases
+    // But we ensure it doesn't contain problematic characters
+    return identifier.replace(/[.$]/g, '_');
+  }
+
+  /**
+   * Escape MongoDB value (not applicable for MongoDB)
+   */
+  escapeValue(value: any): string {
+    // MongoDB doesn't use SQL-style escaping
+    // Values are handled natively as BSON types
+    return JSON.stringify(value);
+  }
+
+  /**
+   * Build MongoDB limit clause (handled by MongoDB driver)
+   */
+  buildLimitClause(limit?: number, offset?: number): string {
+    // MongoDB uses limit() and skip() methods, not SQL LIMIT clause
+    return JSON.stringify({ limit, skip: offset });
+  }
+
+  /**
+   * Get current timestamp in MongoDB format
+   */
+  getCurrentTimestamp(): string {
+    return new Date().toISOString();
+  }
+
+  /**
+   * Check if collection exists
+   */
+  async tableExists(connection: DatabaseConnection, collectionName: string): Promise<boolean> {
+    // For MongoDB, we check if collection exists
+    const collections = await this.getCollections(connection);
+    return collections.includes(collectionName);
+  }
+
+  /**
+   * Get collection schema information (MongoDB is schemaless, but we can infer structure)
+   */
+  async getTableColumns(connection: DatabaseConnection, collectionName: string): Promise<QueryField[]> {
+    // MongoDB is schemaless, so we sample documents to infer structure
+    const sampleDocs = await connection.query(`db.${collectionName}.find().limit(100)`);
+    
+    const fieldTypes = new Map<string, Set<string>>();
+    
+    sampleDocs.forEach((doc: any) => {
+      this.analyzeDocumentFields(doc, fieldTypes);
+    });
+
+    const fields: QueryField[] = [];
+    for (const [fieldName, types] of fieldTypes) {
+      fields.push({
+        name: fieldName,
+        type: Array.from(types).join(' | '),
+        nullable: true, // MongoDB fields are inherently nullable
+        primaryKey: fieldName === '_id'
+      });
+    }
+
+    return fields;
+  }
+
+  /**
+   * Get collection indexes
+   */
+  async getTableIndexes(connection: DatabaseConnection, collectionName: string): Promise<string[]> {
+    const indexes = await connection.query(`db.${collectionName}.getIndexes()`);
+    return indexes.map((index: any) => index.name).filter((name: string) => name !== '_id_');
+  }
+
+  /**
+   * Analyze document fields recursively
+   */
+  private analyzeDocumentFields(obj: any, fieldTypes: Map<string, Set<string>>, prefix: string = ''): void {
+    for (const [key, value] of Object.entries(obj)) {
+      const fieldName = prefix ? `${prefix}.${key}` : key;
+      const valueType = this.getMongoType(value);
+      
+      if (!fieldTypes.has(fieldName)) {
+        fieldTypes.set(fieldName, new Set());
+      }
+      fieldTypes.get(fieldName)!.add(valueType);
+      
+      // Recursively analyze nested objects
+      if (valueType === 'object' && value !== null && !Array.isArray(value)) {
+        this.analyzeDocumentFields(value, fieldTypes, fieldName);
+      }
+    }
+  }
+
+  /**
+   * Get MongoDB BSON type for a value
+   */
+  private getMongoType(value: any): string {
+    if (value === null) return 'null';
+    if (value === undefined) return 'undefined';
+    if (typeof value === 'string') return 'string';
+    if (typeof value === 'number') {
+      return Number.isInteger(value) ? 'int' : 'double';
+    }
+    if (typeof value === 'boolean') return 'bool';
+    if (value instanceof Date) return 'date';
+    if (value instanceof Buffer) return 'binData';
+    if (Array.isArray(value)) return 'array';
+    if (typeof value === 'object') return 'object';
+    return 'mixed';
+  }
+
+  /**
+   * Create database (in MongoDB context, this ensures database exists)
+   */
+  async createDatabase(connection: DatabaseConnection, databaseName: string): Promise<void> {
+    // MongoDB creates databases automatically when first collection is created
+    // We'll create a temporary collection to ensure database exists
+    await connection.query(`use ${databaseName}; db.createCollection('_temp'); db._temp.drop()`);
+  }
+
+  /**
+   * Drop database
+   */
+  async dropDatabase(connection: DatabaseConnection, databaseName: string): Promise<void> {
+    await connection.query(`use ${databaseName}; db.dropDatabase()`);
+  }
+
+  /**
+   * Get MongoDB server version
+   */
+  async getServerVersion(connection: DatabaseConnection): Promise<string> {
+    const result = await connection.query('db.version()');
+    return result || 'Unknown';
+  }
+
+  /**
+   * Get database size in bytes
+   */
+  async getDatabaseSize(connection: DatabaseConnection, databaseName?: string): Promise<number> {
+    const stats = await connection.query('db.stats()');
+    return stats.dataSize || 0;
+  }
+
+  /**
+   * Get collection document count
+   */
+  async getTableRowCount(connection: DatabaseConnection, collectionName: string): Promise<number> {
+    const result = await connection.query(`db.${collectionName}.countDocuments({})`);
+    return result || 0;
+  }
+
+  /**
+   * Get collections in database
+   */
+  async getCollections(connection: DatabaseConnection): Promise<string[]> {
+    const collections = await connection.query('db.getCollectionNames()');
+    return collections || [];
+  }
+
+  /**
+   * Create collection with options
+   */
+  async createCollection(
+    connection: DatabaseConnection, 
+    collectionName: string, 
+    options: any = {}
+  ): Promise<void> {
+    await connection.query(`db.createCollection('${collectionName}', ${JSON.stringify(options)})`);
+  }
+
+  /**
+   * Drop collection
+   */
+  async dropCollection(connection: DatabaseConnection, collectionName: string): Promise<void> {
+    await connection.query(`db.${collectionName}.drop()`);
+  }
+
+  /**
+   * Create index on collection
+   */
+  async createIndex(
+    connection: DatabaseConnection, 
+    collectionName: string, 
+    indexSpec: any, 
+    options: any = {}
+  ): Promise<void> {
+    await connection.query(`db.${collectionName}.createIndex(${JSON.stringify(indexSpec)}, ${JSON.stringify(options)})`);
+  }
+
+  /**
+   * Drop index
+   */
+  async dropIndex(connection: DatabaseConnection, collectionName: string, indexName: string): Promise<void> {
+    await connection.query(`db.${collectionName}.dropIndex('${indexName}')`);
+  }
+
+  /**
+   * Insert document
+   */
+  async insertDocument(connection: DatabaseConnection, collectionName: string, document: MongoDocument): Promise<any> {
+    return await connection.query(`db.${collectionName}.insertOne(${JSON.stringify(document)})`);
+  }
+
+  /**
+   * Insert multiple documents
+   */
+  async insertDocuments(connection: DatabaseConnection, collectionName: string, documents: MongoDocument[]): Promise<any> {
+    return await connection.query(`db.${collectionName}.insertMany(${JSON.stringify(documents)})`);
+  }
+
+  /**
+   * Find documents
+   */
+  async findDocuments(connection: DatabaseConnection, collectionName: string, query: MongoQuery): Promise<MongoDocument[]> {
+    let queryStr = `db.${collectionName}.find(${JSON.stringify(query.filter || {})})`;
+    
+    if (query.projection) {
+      queryStr += `.project(${JSON.stringify(query.projection)})`;
+    }
+    
+    if (query.sort) {
+      queryStr += `.sort(${JSON.stringify(query.sort)})`;
+    }
+    
+    if (query.skip) {
+      queryStr += `.skip(${query.skip})`;
+    }
+    
+    if (query.limit) {
+      queryStr += `.limit(${query.limit})`;
+    }
+
+    return await connection.query(queryStr);
+  }
+
+  /**
+   * Update document
+   */
+  async updateDocument(
+    connection: DatabaseConnection, 
+    collectionName: string, 
+    filter: any, 
+    update: any,
+    options: any = {}
+  ): Promise<any> {
+    const method = options.multi ? 'updateMany' : 'updateOne';
+    return await connection.query(`db.${collectionName}.${method}(${JSON.stringify(filter)}, ${JSON.stringify(update)}, ${JSON.stringify(options)})`);
+  }
+
+  /**
+   * Delete document
+   */
+  async deleteDocument(
+    connection: DatabaseConnection, 
+    collectionName: string, 
+    filter: any,
+    multi: boolean = false
+  ): Promise<any> {
+    const method = multi ? 'deleteMany' : 'deleteOne';
+    return await connection.query(`db.${collectionName}.${method}(${JSON.stringify(filter)})`);
+  }
+
+  /**
+   * Bulk operations
+   */
+  async bulkWrite(
+    connection: DatabaseConnection, 
+    collectionName: string, 
+    operations: MongoBulkOperation[]
+  ): Promise<any> {
+    return await connection.query(`db.${collectionName}.bulkWrite(${JSON.stringify(operations)})`);
+  }
+
+  /**
+   * Aggregate pipeline
+   */
+  async aggregate(connection: DatabaseConnection, collectionName: string, pipeline: any[]): Promise<any[]> {
+    return await connection.query(`db.${collectionName}.aggregate(${JSON.stringify(pipeline)})`);
+  }
+
+  /**
+   * Get collection statistics
+   */
+  async getCollectionStats(connection: DatabaseConnection, collectionName: string): Promise<any> {
+    return await connection.query(`db.${collectionName}.stats()`);
+  }
+
+  /**
+   * Compact collection (for storage optimization)
+   */
+  async compactCollection(connection: DatabaseConnection, collectionName: string): Promise<void> {
+    await connection.query(`db.runCommand({compact: '${collectionName}'})`);
+  }
+
+  /**
+   * Validate collection
+   */
+  async validateCollection(connection: DatabaseConnection, collectionName: string): Promise<any> {
+    return await connection.query(`db.runCommand({validate: '${collectionName}'})`);
+  }
+
+  /**
+   * Get replica set status
+   */
+  async getReplicaSetStatus(connection: DatabaseConnection): Promise<any> {
+    return await connection.query('rs.status()');
+  }
+
+  /**
+   * Get database profiling level
+   */
+  async getProfilingLevel(connection: DatabaseConnection): Promise<number> {
+    const result = await connection.query('db.getProfilingLevel()');
+    return result || 0;
+  }
+
+  /**
+   * Set database profiling level
+   */
+  async setProfilingLevel(connection: DatabaseConnection, level: number, slowOpThreshold?: number): Promise<void> {
+    const options = slowOpThreshold ? `, ${slowOpThreshold}` : '';
+    await connection.query(`db.setProfilingLevel(${level}${options})`);
+  }
+
+  /**
+   * Get current operations
+   */
+  async getCurrentOperations(connection: DatabaseConnection): Promise<any[]> {
+    return await connection.query('db.currentOp()');
+  }
+
+  /**
+   * Kill operation
+   */
+  async killOperation(connection: DatabaseConnection, operationId: number): Promise<void> {
+    await connection.query(`db.killOp(${operationId})`);
+  }
+}

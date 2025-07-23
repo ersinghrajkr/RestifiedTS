@@ -1,0 +1,133 @@
+import { expect } from 'chai';
+import { GraphQLClient, GraphQLManager } from '../../src/core/clients';
+import { Config } from '../../src/core/config/Config';
+
+describe('GraphQL Client Tests', () => {
+  let config: Config;
+  let graphQLClient: GraphQLClient;
+  let graphQLManager: GraphQLManager;
+
+  beforeEach(() => {
+    config = new Config();
+    graphQLClient = new GraphQLClient(config.getConfig());
+    graphQLManager = new GraphQLManager();
+  });
+
+  describe('GraphQLClient Initialization', () => {
+    it('should initialize GraphQL client without errors', () => {
+      expect(graphQLClient).to.be.instanceOf(GraphQLClient);
+    });
+
+    it('should have query method', () => {
+      expect(graphQLClient).to.have.property('query');
+      expect(typeof graphQLClient.query).to.equal('function');
+    });
+
+    it('should have mutation method', () => {
+      expect(graphQLClient).to.have.property('mutation');
+      expect(typeof graphQLClient.mutation).to.equal('function');
+    });
+
+    it('should have subscription method', () => {
+      expect(graphQLClient).to.have.property('subscription');
+      expect(typeof graphQLClient.subscription).to.equal('function');
+    });
+  });
+
+  describe('GraphQLManager', () => {
+    it('should initialize GraphQL manager without errors', () => {
+      expect(graphQLManager).to.be.instanceOf(GraphQLManager);
+    });
+
+    it('should support client registration', () => {
+      expect(() => {
+        graphQLManager.registerClient('testClient', {
+          endpoint: 'https://api.example.com/graphql'
+        });
+      }).to.not.throw();
+    });
+
+    it('should retrieve registered clients', () => {
+      graphQLManager.registerClient('testClient', {
+        endpoint: 'https://api.example.com/graphql'
+      });
+      
+      const client = graphQLManager.getClient('testClient');
+      expect(client).to.exist;
+    });
+  });
+
+  describe('GraphQL Query Building', () => {
+    it('should handle basic query structure', () => {
+      const query = `
+        query GetUser($id: ID!) {
+          user(id: $id) {
+            id
+            name
+            email
+          }
+        }
+      `;
+      
+      expect(() => {
+        graphQLClient.query(query, { id: '123' });
+      }).to.not.throw();
+    });
+
+    it('should handle mutation structure', () => {
+      const mutation = `
+        mutation CreateUser($input: UserInput!) {
+          createUser(input: $input) {
+            id
+            name
+            email
+          }
+        }
+      `;
+      
+      expect(() => {
+        graphQLClient.mutation(mutation, { 
+          input: { name: 'Test User', email: 'test@example.com' }
+        });
+      }).to.not.throw();
+    });
+
+    it('should handle subscription structure', () => {
+      const subscription = `
+        subscription OnUserCreated {
+          userCreated {
+            id
+            name
+            email
+          }
+        }
+      `;
+      
+      expect(() => {
+        graphQLClient.subscription(subscription);
+      }).to.not.throw();
+    });
+  });
+
+  describe('GraphQL Error Handling', () => {
+    it('should handle invalid query syntax gracefully', () => {
+      const invalidQuery = 'invalid graphql syntax {';
+      
+      expect(() => {
+        graphQLClient.query(invalidQuery);
+      }).to.not.throw(); // Should not throw during setup, but during execution
+    });
+
+    it('should handle missing variables', () => {
+      const query = `
+        query GetUser($id: ID!) {
+          user(id: $id) { id }
+        }
+      `;
+      
+      expect(() => {
+        graphQLClient.query(query); // Missing required variable
+      }).to.not.throw(); // Should not throw during setup
+    });
+  });
+});

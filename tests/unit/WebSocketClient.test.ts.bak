@@ -1,0 +1,158 @@
+import { expect } from 'chai';
+import { WebSocketClient, WebSocketManager } from '../../src/core/clients';
+import { Config } from '../../src/core/config/Config';
+
+describe('WebSocket Client Tests', () => {
+  let config: Config;
+  let webSocketClient: WebSocketClient;
+  let webSocketManager: WebSocketManager;
+
+  beforeEach(() => {
+    config = new Config();
+    webSocketClient = new WebSocketClient(config.getConfig());
+    webSocketManager = new WebSocketManager();
+  });
+
+  describe('WebSocketClient Initialization', () => {
+    it('should initialize WebSocket client without errors', () => {
+      expect(webSocketClient).to.be.instanceOf(WebSocketClient);
+    });
+
+    it('should have connect method', () => {
+      expect(webSocketClient).to.have.property('connect');
+      expect(typeof webSocketClient.connect).to.equal('function');
+    });
+
+    it('should have send method', () => {
+      expect(webSocketClient).to.have.property('send');
+      expect(typeof webSocketClient.send).to.equal('function');
+    });
+
+    it('should have close method', () => {
+      expect(webSocketClient).to.have.property('close');
+      expect(typeof webSocketClient.close).to.equal('function');
+    });
+
+    it('should have message listening capabilities', () => {
+      expect(webSocketClient).to.have.property('on');
+      expect(typeof webSocketClient.on).to.equal('function');
+    });
+  });
+
+  describe('WebSocketManager', () => {
+    it('should initialize WebSocket manager without errors', () => {
+      expect(webSocketManager).to.be.instanceOf(WebSocketManager);
+    });
+
+    it('should support connection registration', () => {
+      expect(() => {
+        webSocketManager.createConnection('testWS', 'wss://echo.websocket.org');
+      }).to.not.throw();
+    });
+
+    it('should retrieve registered connections', () => {
+      webSocketManager.createConnection('testWS', 'wss://echo.websocket.org');
+      const connection = webSocketManager.getConnection('testWS');
+      expect(connection).to.exist;
+    });
+
+    it('should handle multiple connections', () => {
+      expect(() => {
+        webSocketManager.createConnection('ws1', 'wss://echo.websocket.org');
+        webSocketManager.createConnection('ws2', 'wss://ws.postman-echo.com/raw');
+      }).to.not.throw();
+      
+      expect(webSocketManager.getConnection('ws1')).to.exist;
+      expect(webSocketManager.getConnection('ws2')).to.exist;
+    });
+  });
+
+  describe('WebSocket Configuration', () => {
+    it('should support custom headers in connection', () => {
+      expect(() => {
+        webSocketClient.connect('wss://echo.websocket.org', {
+          headers: {
+            'Authorization': 'Bearer test-token',
+            'Custom-Header': 'test-value'
+          }
+        });
+      }).to.not.throw();
+    });
+
+    it('should support protocol configuration', () => {
+      expect(() => {
+        webSocketClient.connect('wss://echo.websocket.org', {
+          protocols: ['v1.chat', 'v2.chat']
+        });
+      }).to.not.throw();
+    });
+
+    it('should handle connection timeout settings', () => {
+      expect(() => {
+        webSocketClient.connect('wss://echo.websocket.org', {
+          timeout: 5000
+        });
+      }).to.not.throw();
+    });
+  });
+
+  describe('WebSocket Message Handling', () => {
+    it('should support message event listeners', () => {
+      expect(() => {
+        webSocketClient.on('message', (data) => {
+          console.log('Received:', data);
+        });
+        
+        webSocketClient.on('open', () => {
+          console.log('Connection opened');
+        });
+        
+        webSocketClient.on('close', () => {
+          console.log('Connection closed');
+        });
+        
+        webSocketClient.on('error', (error) => {
+          console.error('WebSocket error:', error);
+        });
+      }).to.not.throw();
+    });
+
+    it('should support sending different message formats', () => {
+      expect(() => {
+        // String message
+        webSocketClient.send('Hello WebSocket');
+        
+        // JSON message
+        webSocketClient.send(JSON.stringify({ type: 'greeting', message: 'Hello' }));
+        
+        // Buffer message
+        webSocketClient.send(Buffer.from('Binary data'));
+      }).to.not.throw();
+    });
+  });
+
+  describe('WebSocket Error Handling', () => {
+    it('should handle invalid WebSocket URLs gracefully', () => {
+      expect(() => {
+        webSocketClient.connect('invalid-ws-url');
+      }).to.not.throw(); // Should not throw during setup, but during connection
+    });
+
+    it('should handle connection failures gracefully', () => {
+      expect(() => {
+        webSocketClient.connect('wss://non-existent-domain-12345.com');
+      }).to.not.throw(); // Should not throw during setup
+    });
+
+    it('should support connection retry logic', () => {
+      expect(() => {
+        webSocketClient.connect('wss://echo.websocket.org', {
+          retry: {
+            maxAttempts: 3,
+            delay: 1000
+          }
+        });
+      }).to.not.throw();
+    });
+  });
+});

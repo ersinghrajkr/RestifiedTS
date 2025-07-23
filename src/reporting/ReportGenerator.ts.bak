@@ -1,8 +1,25 @@
-// src/reporting/ReportGenerator.ts
+/**
+ * RestifiedTS Report Generator
+ * 
+ * Main report generator that orchestrates different reporting formats
+ * for comprehensive test analysis and visualization.
+ */
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { AuditLogEntry, ReportingConfig } from '../types/RestifiedTypes';
+import { 
+  AuditLogEntry, 
+  ReportingConfig, 
+  TestReportData,
+  TestSummary,
+  TestResult,
+  PerformanceMetrics,
+  ErrorAnalysis,
+  SnapshotSummary,
+  TimeSeriesPoint,
+  TrendData,
+  TrendDirection
+} from '../types/RestifiedTypes';
 import { HtmlReporter } from './HtmlReporter';
 import { DiffReporter } from './DiffReporter';
 
@@ -550,109 +567,4 @@ export class ReportGenerator {
   }
 }
 
-// ==========================================
-// INTERFACES AND TYPES
-// ==========================================
-
-export interface TestReportData {
-  metadata: {
-    generatedAt: string;
-    totalTests: number;
-    totalDuration: number;
-    framework: string;
-    version: string;
-  };
-  summary: TestSummary;
-  testResults: TestResult[];
-  performanceMetrics: PerformanceMetrics;
-  errorAnalysis: ErrorAnalysis;
-  snapshots?: SnapshotSummary[];
-  rawData: AuditLogEntry[];
-}
-
-export interface TestSummary {
-  totalTests: number;
-  successfulTests: number;
-  failedTests: number;
-  successRate: number;
-  totalDuration: number;
-  totalRequests: number;
-  averageResponseTime: number;
-  statusCodeDistribution: Record<number, number>;
-  startTime: Date;
-  endTime: Date;
-}
-
-export interface TestResult {
-  testName: string;
-  status: 'passed' | 'failed';
-  duration: number;
-  requestCount: number;
-  averageResponseTime: number;
-  errors: Array<{
-    message: string;
-    stack?: string;
-  }>;
-  requests: Array<{
-    method: string;
-    url: string;
-    statusCode: number;
-    responseTime: number;
-    timestamp: Date;
-  }>;
-}
-
-export interface PerformanceMetrics {
-  totalRequests: number;
-  averageResponseTime: number;
-  minResponseTime: number;
-  maxResponseTime: number;
-  p50ResponseTime: number;
-  p95ResponseTime: number;
-  p99ResponseTime: number;
-  requestsPerSecond: number;
-  errorRate: number;
-  timeSeriesData: TimeSeriesPoint[];
-}
-
-export interface ErrorAnalysis {
-  totalErrors: number;
-  errorTypes: Record<string, number>;
-  errorsByTest: Record<string, number>;
-  commonErrors: Array<{
-    message: string;
-    count: number;
-  }>;
-}
-
-export interface SnapshotSummary {
-  key: string;
-  size: number;
-  lastModified: Date;
-  hasChanges: boolean;
-}
-
-export interface TimeSeriesPoint {
-  timestamp: Date;
-  averageResponseTime: number;
-  requestCount: number;
-  errorCount: number;
-  successRate: number;
-}
-
-export interface TrendData {
-  runs: Array<{
-    runIndex: number;
-    timestamp: Date;
-    summary: TestSummary;
-    performance: PerformanceMetrics;
-  }>;
-  trends: {
-    successRate: TrendDirection;
-    averageResponseTime: TrendDirection;
-    errorRate: TrendDirection;
-    requestsPerSecond: TrendDirection;
-  };
-}
-
-export type TrendDirection = 'increasing' | 'decreasing' | 'stable';
+// Note: All interfaces are now defined in ../types/RestifiedTypes.ts
