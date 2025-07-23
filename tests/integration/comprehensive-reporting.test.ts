@@ -26,6 +26,7 @@ describe('Comprehensive Reporting Integration Tests @integration @smoke', () => 
           }
         };
 
+        const testStartTime = Date.now();
         const result = await restified
           .given()
             .baseURL('https://jsonplaceholder.typicode.com')
@@ -33,7 +34,7 @@ describe('Comprehensive Reporting Integration Tests @integration @smoke', () => 
             .header('X-Test-ID', 'comprehensive-success-test')
             .header('X-Request-Timestamp', new Date().toISOString())
             .body(requestPayload)
-            .variable('testStartTime', Date.now())
+            .contextVariable('testStartTime', testStartTime)
           .when()
             .post('/posts')
           .then()
@@ -43,8 +44,8 @@ describe('Comprehensive Reporting Integration Tests @integration @smoke', () => 
             .jsonPath('$.body', requestPayload.body)
             .jsonPath('$.userId', requestPayload.userId)
             .extract('$.id', 'createdPostId')
-            .variable('testEndTime', Date.now())
           .execute();
+        const testEndTime = Date.now();
 
         // Verify successful response
         expect(result.status).to.equal(201);
@@ -97,7 +98,7 @@ describe('Comprehensive Reporting Integration Tests @integration @smoke', () => 
             .header('Content-Type', 'application/json')
             .header('X-Test-ID', 'comprehensive-failure-test')
             .body(requestPayload)
-            .variable('failureTestStart', Date.now())
+            .contextVariable('failureTestStart', Date.now())
           .when()
             .post('/posts/999999/invalid-endpoint') // This should fail
           .then()
@@ -276,8 +277,8 @@ describe('Comprehensive Reporting Integration Tests @integration @smoke', () => 
           .given()
             .baseURL('https://httpbin.org')
             .header('Content-Type', 'application/json')
-            .variable('testId', 'variable-resolution-demo')
-            .variable('staticValue', 'This is a static value')
+            .contextVariable('testId', 'variable-resolution-demo')
+            .contextVariable('staticValue', 'This is a static value')
             .body({
               testData: testData,
               additionalInfo: {

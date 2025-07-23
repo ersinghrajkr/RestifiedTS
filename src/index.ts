@@ -129,6 +129,13 @@ export {
   TestTrendData
 } from './reporting/ReportingTypes';
 
+// CLI exports
+export {
+  TestGenerator,
+  ProjectScaffolder,
+  ConfigGenerator
+} from './cli/cli';
+
 // Re-export for default
 import { RestifiedTS } from './core/dsl/RestifiedTS';
 

@@ -272,7 +272,7 @@ describe('Authentication Integration Tests @integration @smoke', () => {
         const result = await restified
           .given()
             .baseURL('https://httpbin.org')
-            .variable('authToken', 'dynamic-token-12345')
+            .contextVariable('authToken', 'dynamic-token-12345')
             .header('Authorization', 'Bearer {{authToken}}')
           .when()
             .get('/headers')
@@ -296,7 +296,7 @@ describe('Authentication Integration Tests @integration @smoke', () => {
         const result = await restified
           .given()
             .baseURL('https://httpbin.org')
-            .variable('tokenValue', 'templated-token-xyz')
+            .contextVariable('tokenValue', 'templated-token-xyz')
             .bearerToken('{{tokenValue}}')
           .when()
             .get('/headers')
@@ -320,7 +320,7 @@ describe('Authentication Integration Tests @integration @smoke', () => {
         const result = await restified
           .given()
             .baseURL('https://httpbin.org')
-            .variable('keyValue', 'templated-api-key-123')
+            .contextVariable('keyValue', 'templated-api-key-123')
             .apiKey('{{keyValue}}', 'X-Template-Key')
           .when()
             .get('/headers')

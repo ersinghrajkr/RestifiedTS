@@ -100,6 +100,7 @@
   "dependencies": {
     "@faker-js/faker": "^8.4.1",
     "ajv": "^8.17.1",
+    "ajv-formats": "^2.1.1",
     "axios": "^1.6.5",
     "chai": "^4.3.10",
     "chalk": "^4.1.2",

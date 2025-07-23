@@ -9,15 +9,23 @@ import {
   ResponseLoggingInterceptor,
   UserAgentInterceptor
 } from '../../src/interceptors';
-import { InterceptorContext, InterceptorPriority } from '../../src/interceptors/InterceptorTypes';
+import { InterceptorContext, InterceptorPriority, InterceptorPhase } from '../../src/interceptors/InterceptorTypes';
 
 describe('Interceptors and Plugins Integration Tests @integration @regression', () => {
   let interceptorManager: InterceptorManager;
   let pluginSystem: InterceptorPluginSystem;
 
   beforeEach(() => {
-    interceptorManager = new InterceptorManager();
-    pluginSystem = new InterceptorPluginSystem();
+    interceptorManager = new InterceptorManager({});
+    const mockServices = {
+      httpClient: {},
+      variableStore: {},
+      responseStore: {},
+      assertionManager: {},
+      logger: { info: () => {}, error: () => {} },
+      config: {}
+    };
+    pluginSystem = new InterceptorPluginSystem(mockServices);
   });
 
   describe('Request Interceptor Integration', () => {
@@ -30,7 +38,7 @@ describe('Interceptors and Plugins Integration Tests @integration @regression', 
         priority: InterceptorPriority.HIGH,
         enabled: true,
         description: 'First interceptor',
-        phase: 'request' as const,
+        phase: InterceptorPhase.REQUEST,
         execute: async (config: any, context: InterceptorContext) => {
           executionOrder.push('first');
           config.headers = config.headers || {};
@@ -44,7 +52,7 @@ describe('Interceptors and Plugins Integration Tests @integration @regression', 
         priority: InterceptorPriority.NORMAL,
         enabled: true,
         description: 'Second interceptor',
-        phase: 'request' as const,
+        phase: InterceptorPhase.REQUEST,
         execute: async (config: any, context: InterceptorContext) => {
           executionOrder.push('second');
           config.headers = config.headers || {};
@@ -58,7 +66,7 @@ describe('Interceptors and Plugins Integration Tests @integration @regression', 
         priority: InterceptorPriority.LOW,
         enabled: true,
         description: 'Third interceptor',
-        phase: 'request' as const,
+        phase: InterceptorPhase.REQUEST,
         execute: async (config: any, context: InterceptorContext) => {
           executionOrder.push('third');
           config.headers = config.headers || {};
@@ -82,8 +90,11 @@ describe('Interceptors and Plugins Integration Tests @integration @regression', 
       const mockContext: InterceptorContext = {
         requestId: 'test-req-1',
         timestamp: new Date(),
-        phase: 'request',
-        metadata: {}
+        phase: InterceptorPhase.REQUEST,
+        attempt: 1,
+        metadata: {},
+        variables: {},
+        config: mockConfig
       };
 
       // Execute the interceptor chain
@@ -104,14 +115,14 @@ describe('Interceptors and Plugins Integration Tests @integration @regression', 
         priority: InterceptorPriority.NORMAL,
         enabled: true,
         description: 'Faulty interceptor',
-        phase: 'request' as const,
+        phase: InterceptorPhase.REQUEST,
         execute: async (config: any, context: InterceptorContext) => {
           throw new Error('Interceptor execution failed');
         },
         onError: async (error: any, context: InterceptorContext) => {
           // Log error and return modified config
           context.metadata.errorHandled = true;
-          return { ...config, errorRecovered: true };
+          return { ...context.config, errorRecovered: true };
         }
       };
 
@@ -120,7 +131,7 @@ describe('Interceptors and Plugins Integration Tests @integration @regression', 
         priority: InterceptorPriority.LOW,
         enabled: true,
         description: 'Normal interceptor',
-        phase: 'request' as const,
+        phase: InterceptorPhase.REQUEST,
         execute: async (config: any, context: InterceptorContext) => {
           config.headers = config.headers || {};
           config.headers['X-Normal'] = 'executed';
@@ -135,8 +146,11 @@ describe('Interceptors and Plugins Integration Tests @integration @regression', 
       const mockContext: InterceptorContext = {
         requestId: 'test-req-error',
         timestamp: new Date(),
-        phase: 'request',
-        metadata: {}
+        phase: InterceptorPhase.REQUEST,
+        attempt: 1,
+        metadata: {},
+        variables: {},
+        config: mockConfig
       };
 
       // Should not throw despite faulty interceptor
@@ -152,7 +166,7 @@ describe('Interceptors and Plugins Integration Tests @integration @regression', 
         priority: InterceptorPriority.NORMAL,
         enabled: true,
         description: 'Enabled interceptor',
-        phase: 'request' as const,
+        phase: InterceptorPhase.REQUEST,
         execute: async (config: any, context: InterceptorContext) => {
           config.executed = config.executed || [];
           config.executed.push('enabled');
@@ -165,7 +179,7 @@ describe('Interceptors and Plugins Integration Tests @integration @regression', 
         priority: InterceptorPriority.NORMAL,
         enabled: false,
         description: 'Disabled interceptor',
-        phase: 'request' as const,
+        phase: InterceptorPhase.REQUEST,
         execute: async (config: any, context: InterceptorContext) => {
           config.executed = config.executed || [];
           config.executed.push('disabled');
@@ -180,14 +194,17 @@ describe('Interceptors and Plugins Integration Tests @integration @regression', 
       const mockContext: InterceptorContext = {
         requestId: 'test-req-disabled',
         timestamp: new Date(),
-        phase: 'request',
-        metadata: {}
+        phase: InterceptorPhase.REQUEST,
+        attempt: 1,
+        metadata: {},
+        variables: {},
+        config: mockConfig
       };
 
       const result = await interceptorManager.executeRequestInterceptors(mockConfig, mockContext);
 
       // Only enabled interceptor should have executed
-      expect(result.executed).to.deep.equal(['enabled']);
+      expect((result as any).executed).to.deep.equal(['enabled']);
     });
   });
 
@@ -208,8 +225,11 @@ describe('Interceptors and Plugins Integration Tests @integration @regression', 
       const mockContext: InterceptorContext = {
         requestId: 'auth-test',
         timestamp: new Date(),
-        phase: 'request',
-        metadata: {}
+        phase: InterceptorPhase.REQUEST,
+        attempt: 1,
+        metadata: {},
+        variables: {},
+        config: mockConfig
       };
 
       const result = await interceptorManager.executeRequestInterceptors(mockConfig, mockContext);
@@ -225,8 +245,11 @@ describe('Interceptors and Plugins Integration Tests @integration @regression', 
       const mockContext: InterceptorContext = {
         requestId: 'ua-test',
         timestamp: new Date(),
-        phase: 'request',
-        metadata: {}
+        phase: InterceptorPhase.REQUEST,
+        attempt: 1,
+        metadata: {},
+        variables: {},
+        config: mockConfig
       };
 
       const result = await interceptorManager.executeRequestInterceptors(mockConfig, mockContext);
@@ -249,8 +272,11 @@ describe('Interceptors and Plugins Integration Tests @integration @regression', 
       const mockContext: InterceptorContext = {
         requestId: 'log-test',
         timestamp: new Date(),
-        phase: 'request',
-        metadata: {}
+        phase: InterceptorPhase.REQUEST,
+        attempt: 1,
+        metadata: {},
+        variables: {},
+        config: mockConfig
       };
 
       await interceptorManager.executeRequestInterceptors(mockConfig, mockContext);
@@ -262,7 +288,7 @@ describe('Interceptors and Plugins Integration Tests @integration @regression', 
   });
 
   describe('Plugin System Integration', () => {
-    it('should integrate plugins with interceptor system', () => {
+    it('should integrate plugins with interceptor system', async () => {
       let pluginInitialized = false;
       let interceptorRegistered = false;
 
@@ -270,7 +296,9 @@ describe('Interceptors and Plugins Integration Tests @integration @regression', 
         name: 'testIntegrationPlugin',
         version: '1.0.0',
         description: 'Test plugin for integration',
-        initialize: (system: any) => {
+        enabled: true,
+        priority: InterceptorPriority.NORMAL,
+        initialize: (context: any) => {
           pluginInitialized = true;
           
           // Plugin adds its own interceptor
@@ -279,7 +307,7 @@ describe('Interceptors and Plugins Integration Tests @integration @regression', 
             priority: InterceptorPriority.NORMAL,
             enabled: true,
             description: 'Interceptor added by plugin',
-            phase: 'request' as const,
+            phase: InterceptorPhase.REQUEST,
             execute: async (config: any, context: InterceptorContext) => {
               config.headers = config.headers || {};
               config.headers['X-Plugin-Interceptor'] = 'executed';
@@ -287,17 +315,17 @@ describe('Interceptors and Plugins Integration Tests @integration @regression', 
             }
           };
 
-          system.registerInterceptor(pluginInterceptor);
+          context.services.registerInterceptor(pluginInterceptor);
           interceptorRegistered = true;
         }
       };
 
-      pluginSystem.loadPlugin(testPlugin);
+      await pluginSystem.registerPlugin(testPlugin);
 
       expect(pluginInitialized).to.be.true;
       expect(interceptorRegistered).to.be.true;
-      expect(pluginSystem.getInterceptors()).to.have.length(1);
-      expect(pluginSystem.getPlugins()).to.have.length(1);
+      expect(pluginSystem.getAllInterceptors()).to.have.length(1);
+      expect(pluginSystem.getAllPlugins()).to.have.length(1);
     });
 
     it('should handle plugin lifecycle events', async () => {
@@ -306,7 +334,10 @@ describe('Interceptors and Plugins Integration Tests @integration @regression', 
       const lifecyclePlugin = {
         name: 'lifecyclePlugin',
         version: '1.0.0',
-        initialize: () => {
+        description: 'Lifecycle plugin for testing',
+        enabled: true,
+        priority: InterceptorPriority.NORMAL,
+        initialize: (context: any) => {
           lifecycleEvents.push('initialize');
         },
         cleanup: async () => {
@@ -314,33 +345,36 @@ describe('Interceptors and Plugins Integration Tests @integration @regression', 
         }
       };
 
-      pluginSystem.loadPlugin(lifecyclePlugin);
+      await pluginSystem.registerPlugin(lifecyclePlugin);
       expect(lifecycleEvents).to.include('initialize');
 
-      await pluginSystem.unloadPlugin('lifecyclePlugin');
+      await pluginSystem.unregisterPlugin('lifecyclePlugin');
       expect(lifecycleEvents).to.include('cleanup');
     });
 
-    it('should manage plugin configurations', () => {
+    it('should manage plugin configurations', async () => {
       const configurablePlugin = {
         name: 'configurablePlugin',
         version: '1.0.0',
+        description: 'Configurable plugin for testing',
+        enabled: true,
+        priority: InterceptorPriority.NORMAL,
         config: {
           setting1: 'value1',
           setting2: 42,
           setting3: true
         },
-        initialize: (system: any, config: any) => {
-          expect(config).to.exist;
-          expect(config.setting1).to.equal('value1');
-          expect(config.setting2).to.equal(42);
-          expect(config.setting3).to.be.true;
+        initialize: (context: any) => {
+          expect(context.config).to.exist;
+          expect(context.config.setting1).to.equal('value1');
+          expect(context.config.setting2).to.equal(42);
+          expect(context.config.setting3).to.be.true;
         }
       };
 
-      expect(() => {
-        pluginSystem.loadPlugin(configurablePlugin);
-      }).to.not.throw();
+      await pluginSystem.registerPlugin(configurablePlugin);
+      // If we get here without throwing, the plugin was registered successfully
+      expect(true).to.be.true;
     });
   });
 
@@ -363,13 +397,13 @@ describe('Interceptors and Plugins Integration Tests @integration @regression', 
         interceptorManager.registerInterceptor(interceptor);
       });
 
-      const allInterceptors = interceptorManager.listInterceptors();
+      const allInterceptors = interceptorManager.getAllInterceptors();
       
       expect(allInterceptors.length).to.be.greaterThan(5);
-      expect(allInterceptors.some(i => i.name === 'requestLogging')).to.be.true;
-      expect(allInterceptors.some(i => i.name === 'responseLogging')).to.be.true;
-      expect(allInterceptors.some(i => i.name === 'userAgent')).to.be.true;
-      expect(allInterceptors.some(i => i.name === 'retry')).to.be.true;
+      expect(allInterceptors.some((i: any) => i.name === 'requestLogging')).to.be.true;
+      expect(allInterceptors.some((i: any) => i.name === 'responseLogging')).to.be.true;
+      expect(allInterceptors.some((i: any) => i.name === 'userAgent')).to.be.true;
+      expect(allInterceptors.some((i: any) => i.name === 'retry')).to.be.true;
     });
 
     it('should create interceptors with custom configuration', () => {
@@ -379,11 +413,11 @@ describe('Interceptors and Plugins Integration Tests @integration @regression', 
       interceptorManager.registerInterceptor(customTimeoutInterceptor);
       interceptorManager.registerInterceptor(customUserAgentInterceptor);
 
-      const interceptors = interceptorManager.listInterceptors();
+      const interceptors = interceptorManager.getAllInterceptors();
       
       expect(interceptors).to.have.length(2);
-      expect(interceptors.some(i => i.name === 'timeout')).to.be.true;
-      expect(interceptors.some(i => i.name === 'userAgent')).to.be.true;
+      expect(interceptors.some((i: any) => i.name === 'timeout')).to.be.true;
+      expect(interceptors.some((i: any) => i.name === 'userAgent')).to.be.true;
     });
   });
 
@@ -394,7 +428,7 @@ describe('Interceptors and Plugins Integration Tests @integration @regression', 
         priority: InterceptorPriority.NORMAL,
         enabled: true,
         description: 'Performance tracking interceptor',
-        phase: 'request' as const,
+        phase: InterceptorPhase.REQUEST,
         execute: async (config: any, context: InterceptorContext) => {
           // Simulate some processing time
           await new Promise(resolve => setTimeout(resolve, 10));
@@ -410,8 +444,11 @@ describe('Interceptors and Plugins Integration Tests @integration @regression', 
         const mockContext: InterceptorContext = {
           requestId: `perf-test-${i}`,
           timestamp: new Date(),
-          phase: 'request',
-          metadata: {}
+          phase: InterceptorPhase.REQUEST,
+          attempt: 1,
+          metadata: {},
+          variables: {},
+          config: mockConfig
         };
 
         await interceptorManager.executeRequestInterceptors(mockConfig, mockContext);
@@ -438,7 +475,7 @@ describe('Interceptors and Plugins Integration Tests @integration @regression', 
       interceptorManager.registerInterceptor(responseInterceptor);
       interceptorManager.registerInterceptor(authInterceptor);
 
-      const systemStats = interceptorManager.getSystemStatistics();
+      const systemStats = interceptorManager.getStatistics();
 
       expect(systemStats).to.exist;
       expect(systemStats.totalInterceptors).to.equal(3);

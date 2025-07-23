@@ -30,6 +30,7 @@ export class ThenStep implements IThenStep {
   private config: Config;
   private extractedData: Record<string, any> = {};
   private assertionResults: AssertionResult[] = [];
+  private waitOperations: (() => Promise<void>)[] = [];
 
   constructor(
     response: RestifiedResponse | undefined,
@@ -750,15 +751,48 @@ export class ThenStep implements IThenStep {
    * Wait for specified time
    */
   wait(ms: number): IThenStep {
-    // TODO: Implement wait functionality
+    if (ms < 0) {
+      throw new Error('Wait time cannot be negative');
+    }
+    
+    // Add wait as a deferred operation to be executed when execute() is called
+    this.waitOperations.push(async () => {
+      await new Promise(resolve => setTimeout(resolve, ms));
+    });
+    
     return this;
   }
 
   /**
    * Wait until condition is met
    */
-  waitUntil(condition: () => boolean | Promise<boolean>, timeout?: number): IThenStep {
-    // TODO: Implement wait until functionality
+  waitUntil(condition: () => boolean | Promise<boolean>, timeout: number = 5000): IThenStep {
+    if (timeout < 0) {
+      throw new Error('Timeout cannot be negative');
+    }
+    
+    // Add waitUntil as a deferred operation
+    this.waitOperations.push(async () => {
+      const startTime = Date.now();
+      
+      while (Date.now() - startTime < timeout) {
+        try {
+          const result = await Promise.resolve(condition());
+          if (result) {
+            return; // Condition met, exit wait
+          }
+        } catch (error) {
+          // If condition throws an error, treat as false and continue waiting
+          console.warn('Condition evaluation failed:', error);
+        }
+        
+        // Wait 100ms before checking condition again
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
+      throw new Error(`Condition not met within ${timeout}ms timeout`);
+    });
+    
     return this;
   }
 
@@ -827,6 +861,11 @@ export class ThenStep implements IThenStep {
    * Final execution method
    */
   async execute(): Promise<RestifiedResponse> {
+    // Execute all wait operations first
+    for (const waitOperation of this.waitOperations) {
+      await waitOperation();
+    }
+    
     // Execute all assertions
     for (const assertion of this.assertionResults) {
       if (!assertion.passed) {

@@ -206,9 +206,9 @@ export interface IGivenStep {
   pathParam(name: string, value: any): IGivenStep;
   pathParams(params: Record<string, any>): IGivenStep;
   
-  // Variable methods
-  variable(name: string, value: any): IGivenStep;
-  variables(variables: Record<string, any>): IGivenStep;
+  // Context Variable methods
+  contextVariable(name: string, value: any): IGivenStep;
+  contextVariables(variables: Record<string, any>): IGivenStep;
   
   // File methods
   file(name: string, filePath: string): IGivenStep;
@@ -231,6 +231,9 @@ export interface IGivenStep {
   log(message: string): IGivenStep;
   tag(tag: string): IGivenStep;
   tags(tags: string[]): IGivenStep;
+  
+  // Wait methods
+  wait(ms: number): Promise<IGivenStep>;
   
   // Transition to when step
   when(): IWhenStep;
@@ -256,6 +259,9 @@ export interface IWhenStep {
   
   // WebSocket methods
   websocket(path?: string): IWhenStep;
+  
+  // Wait methods
+  wait(ms: number): Promise<IWhenStep>;
   
   // Execution
   execute(): Promise<IThenStep>;

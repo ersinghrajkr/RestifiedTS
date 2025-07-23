@@ -288,7 +288,7 @@ describe('GraphQL Client Tests @unit @integration', () => {
       const builder = graphQLClient.queryBuilder();
       const queryString = builder
         .query('GetUser')
-        .variable('id', 'ID!', '123')
+        .contextVariable('id', 'ID!', '123')
         .field('user', { id: '$id' }, ['id', 'name', 'email'])
         .build();
 
@@ -301,7 +301,7 @@ describe('GraphQL Client Tests @unit @integration', () => {
       const builder = graphQLClient.queryBuilder();
       const mutationString = builder
         .mutation('CreateUser')
-        .variable('input', 'UserInput!', { name: 'Test', email: 'test@example.com' })
+        .contextVariable('input', 'UserInput!', { name: 'Test', email: 'test@example.com' })
         .field('createUser', { input: '$input' }, ['id', 'name'])
         .build();
 

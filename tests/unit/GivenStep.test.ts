@@ -40,7 +40,7 @@ describe('GivenStep DSL', () => {
     });
 
     it('should set variables', () => {
-      const result = givenStep.variable('userId', '12345');
+      const result = givenStep.contextVariable('userId', '12345');
       expect(result).to.be.instanceOf(GivenStep);
     });
 
@@ -57,7 +57,7 @@ describe('GivenStep DSL', () => {
         .header('Authorization', 'Bearer token')
         .queryParam('limit', '10')
         .pathParam('id', '123')
-        .variable('env', 'test')
+        .contextVariable('env', 'test')
         .timeout(3000);
       
       expect(result).to.be.instanceOf(GivenStep);

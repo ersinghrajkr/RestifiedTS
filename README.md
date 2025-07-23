@@ -90,7 +90,7 @@ await restified
 await restified
   .given()
     .baseURL('https://api.example.com')
-    .variable('userId', '12345')
+    .contextVariable('userId', '12345')
     .body({
       id: '{{$random.uuid}}',
       name: '{{$faker.name.fullName}}',
@@ -308,7 +308,7 @@ const promises = Array.from({ length: 10 }, (_, i) =>
   restified
     .given()
       .baseURL('https://api.example.com')
-      .variable('requestId', i)
+      .contextVariable('requestId', i)
     .when()
       .get('/load-test/{{requestId}}')
     .then()
@@ -471,8 +471,8 @@ for (const data of testData) {
     await restified
       .given()
         .baseURL('https://api.example.com')
-        .variable('userId', data.userId)
-        .variable('expectedName', data.expectedName)
+        .contextVariable('userId', data.userId)
+        .contextVariable('expectedName', data.expectedName)
       .when()
         .get('/users/{{userId}}')
       .then()

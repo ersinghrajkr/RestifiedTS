@@ -50,7 +50,7 @@ describe('@smoke Framework Smoke Tests', () => {
             .baseURL('https://test.com')
             .header('Content-Type', 'application/json')
             .queryParam('test', 'value')
-            .variable('env', 'test')
+            .contextVariable('env', 'test')
           .when()
             .get('/test');
       }).to.not.throw();

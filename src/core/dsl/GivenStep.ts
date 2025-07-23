@@ -234,17 +234,17 @@ export class GivenStep implements IGivenStep {
   }
 
   /**
-   * Set a single variable
+   * Set a context variable that can be used in templates within this request chain
    */
-  variable(name: string, value: any): IGivenStep {
+  contextVariable(name: string, value: any): IGivenStep {
     this.variableStore.setLocal(name, value);
     return this;
   }
 
   /**
-   * Set multiple variables
+   * Set multiple context variables at once
    */
-  variables(variables: Record<string, any>): IGivenStep {
+  contextVariables(variables: Record<string, any>): IGivenStep {
     this.variableStore.setLocalBatch(variables);
     return this;
   }
@@ -331,6 +331,19 @@ export class GivenStep implements IGivenStep {
   tags(tags: string[]): IGivenStep {
     // TODO: Implement multiple request tagging
     return this;
+  }
+
+  /**
+   * Wait for specified time before proceeding
+   */
+  wait(ms: number): Promise<IGivenStep> {
+    if (ms < 0) {
+      throw new Error('Wait time cannot be negative');
+    }
+    
+    return new Promise(resolve => {
+      setTimeout(() => resolve(this), ms);
+    });
   }
 
   /**

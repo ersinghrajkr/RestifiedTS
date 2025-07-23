@@ -11,7 +11,7 @@ describe('Variables and Templating Integration Tests', () => {
         const result = await restified
           .given()
             .baseURL('https://jsonplaceholder.typicode.com')
-            .variable('postId', '1')
+            .contextVariable('postId', '1')
             .pathParam('id', '{{postId}}')
           .when()
             .get('/posts/{{id}}')
@@ -35,8 +35,8 @@ describe('Variables and Templating Integration Tests', () => {
         const result = await restified
           .given()
             .baseURL('https://httpbin.org')
-            .variable('authToken', 'bearer-token-12345')
-            .variable('apiVersion', 'v1')
+            .contextVariable('authToken', 'bearer-token-12345')
+            .contextVariable('apiVersion', 'v1')
             .header('Authorization', 'Bearer {{authToken}}')
             .header('X-API-Version', '{{apiVersion}}')
           .when()
@@ -62,8 +62,8 @@ describe('Variables and Templating Integration Tests', () => {
         const result = await restified
           .given()
             .baseURL('https://httpbin.org')
-            .variable('userId', '123')
-            .variable('limit', '10')
+            .contextVariable('userId', '123')
+            .contextVariable('limit', '10')
             .queryParam('user_id', '{{userId}}')
             .queryParam('limit', '{{limit}}')
           .when()
@@ -89,8 +89,8 @@ describe('Variables and Templating Integration Tests', () => {
         const result = await restified
           .given()
             .baseURL('https://httpbin.org')
-            .variable('userName', 'RestifiedTS User')
-            .variable('userEmail', 'user@restifiedts.com')
+            .contextVariable('userName', 'RestifiedTS User')
+            .contextVariable('userEmail', 'user@restifiedts.com')
             .header('Content-Type', 'application/json')
             .body({
               name: '{{userName}}',
@@ -123,7 +123,7 @@ describe('Variables and Templating Integration Tests', () => {
         const result = await restified
           .given()
             .baseURL('https://httpbin.org')
-            .variable('config', {
+            .contextVariable('config', {
               api: {
                 version: 'v2',
                 key: 'nested-api-key'
@@ -161,8 +161,8 @@ describe('Variables and Templating Integration Tests', () => {
         const result = await restified
           .given()
             .baseURL('https://httpbin.org')
-            .variable('tags', ['api', 'testing', 'automation'])
-            .variable('priorities', [1, 2, 3])
+            .contextVariable('tags', ['api', 'testing', 'automation'])
+            .contextVariable('priorities', [1, 2, 3])
             .queryParam('tag1', '{{tags.0}}')
             .queryParam('tag2', '{{tags.1}}')
             .queryParam('priority', '{{priorities.0}}')
@@ -190,9 +190,9 @@ describe('Variables and Templating Integration Tests', () => {
         const result = await restified
           .given()
             .baseURL('https://httpbin.org')
-            .variable('baseToken', 'base-token')
-            .variable('fullToken', 'Bearer {{baseToken}}-extended')
-            .variable('requestId', '{{$random.uuid}}')
+            .contextVariable('baseToken', 'base-token')
+            .contextVariable('fullToken', 'Bearer {{baseToken}}-extended')
+            .contextVariable('requestId', '{{$random.uuid}}')
             .header('Authorization', '{{fullToken}}')
             .header('X-Request-ID', '{{requestId}}')
           .when()
@@ -451,7 +451,7 @@ describe('Variables and Templating Integration Tests', () => {
         const result = await restified
           .given()
             .baseURL('https://httpbin.org')
-            .variable('environment', 'testing') // Local override
+            .contextVariable('environment', 'testing') // Local override
             .header('X-Environment', '{{environment}}')
           .when()
             .get('/headers')

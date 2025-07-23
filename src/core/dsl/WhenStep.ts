@@ -179,6 +179,19 @@ export class WhenStep implements IWhenStep {
   }
 
   /**
+   * Wait for specified time before proceeding
+   */
+  wait(ms: number): Promise<IWhenStep> {
+    if (ms < 0) {
+      throw new Error('Wait time cannot be negative');
+    }
+    
+    return new Promise(resolve => {
+      setTimeout(() => resolve(this), ms);
+    });
+  }
+
+  /**
    * Execute the request and return ThenStep
    */
   async execute(): Promise<IThenStep> {
