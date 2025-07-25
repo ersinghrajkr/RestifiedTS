@@ -1,0 +1,14 @@
+{
+  "api": {
+    "baseURL": "https://jsonplaceholder.typicode.com",
+    "timeout": 30000
+  },
+  "reporting": {
+    "enabled": true,
+    "directory": "reports",
+    "formats": [
+      "html",
+      "json"
+    ]
+  }
+}

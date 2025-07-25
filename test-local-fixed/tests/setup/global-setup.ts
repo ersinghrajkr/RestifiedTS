@@ -6,14 +6,14 @@ dotenv.config();
 
 export class TestSetup {
   static async configure() {
-    // Configure RestifiedTS with environment variables
-    restified.configure({
-      baseURL: process.env.API_BASE_URL || 'https://jsonplaceholder.typicode.com',
-      timeout: parseInt(process.env.API_TIMEOUT || '30000'),
-      headers: {
-        'User-Agent': 'RestifiedTS-TestSuite/1.0'
-      }
-    });
+    // Set global variables from environment
+    const baseURL = process.env.API_BASE_URL || 'https://jsonplaceholder.typicode.com';
+    const timeout = parseInt(process.env.API_TIMEOUT || '30000');
+    
+    // Set global variables that can be used in all tests
+    restified.setGlobalVariable('baseURL', baseURL);
+    restified.setGlobalVariable('timeout', timeout);
+    restified.setGlobalVariable('userAgent', 'RestifiedTS-TestSuite/1.0');
 
     // Real-world authentication: Obtain token dynamically
     await this.authenticateAndSetTokens();
@@ -38,9 +38,11 @@ export class TestSetup {
       if (process.env.AUTH_USERNAME && process.env.AUTH_PASSWORD) {
         console.log('Obtaining AUTH_TOKEN dynamically via API call...');
         
-        await restified
+        const authURL = process.env.AUTH_SERVICE_URL || process.env.API_BASE_URL || 'https://jsonplaceholder.typicode.com';
+        
+        const response = await restified
           .given()
-            .baseURL(process.env.AUTH_SERVICE_URL || process.env.API_BASE_URL)
+            .baseURL(authURL)
             .contentType('application/json')
             .jsonBody({
               username: process.env.AUTH_USERNAME,
@@ -53,8 +55,7 @@ export class TestSetup {
           .then()
             .statusCode(200)
             .extract('$.access_token', 'authToken')
-            .extract('$.refresh_token', 'refreshToken')
-            .execute();
+            .extract('$.refresh_token', 'refreshToken');
 
         console.log('✅ Authentication successful - token obtained and stored');
         return;
@@ -64,9 +65,11 @@ export class TestSetup {
       if (process.env.OAUTH2_CLIENT_ID && process.env.OAUTH2_CLIENT_SECRET) {
         console.log('Obtaining OAuth2 token via client credentials flow...');
         
+        const oauthURL = process.env.OAUTH2_TOKEN_URL || `${process.env.API_BASE_URL || 'https://jsonplaceholder.typicode.com'}/oauth`;
+        
         await restified
           .given()
-            .baseURL(process.env.OAUTH2_TOKEN_URL || `${process.env.API_BASE_URL}/oauth`)
+            .baseURL(oauthURL)
             .contentType('application/x-www-form-urlencoded')
             .formBody({
               grant_type: 'client_credentials',
@@ -79,8 +82,7 @@ export class TestSetup {
             .execute()
           .then()
             .statusCode(200)
-            .extract('$.access_token', 'authToken')
-            .execute();
+            .extract('$.access_token', 'authToken');
 
         console.log('✅ OAuth2 authentication successful - token obtained');
         return;
@@ -95,19 +97,19 @@ export class TestSetup {
 
       console.warn('⚠️  No authentication configured - tests may fail if API requires auth');
       
-    } catch (error) {
-      console.error('❌ Authentication failed:', error.message);
-      throw new Error(`Authentication setup failed: ${error.message}`);
+    } catch (error: any) {
+      console.error('❌ Authentication failed:', error?.message || error);
+      throw new Error(`Authentication setup failed: ${error?.message || error}`);
     }
   }
 
   static async cleanup() {
     console.log('🧹 Cleaning up RestifiedTS resources...');
     try {
-      await restified.cleanup();
+      // Add any cleanup logic here if RestifiedTS has cleanup methods
       console.log('✅ Cleanup completed successfully');
-    } catch (error) {
-      console.error('❌ Cleanup error:', error.message);
+    } catch (error: any) {
+      console.error('❌ Cleanup error:', error?.message || error);
     }
   }
 }

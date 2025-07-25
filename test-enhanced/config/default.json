@@ -1,14 +1,25 @@
 {
-  "api": {
-    "baseURL": "https://jsonplaceholder.typicode.com",
-    "timeout": 30000
+  "timeout": 30000,
+  "retries": 3,
+  "baseURL": "https://api.example.com",
+  "headers": {
+    "Content-Type": "application/json",
+    "Accept": "application/json"
+  },
+  "auth": {
+    "type": "bearer",
+    "token": "${API_TOKEN}"
+  },
+  "logging": {
+    "level": "info",
+    "requests": true,
+    "responses": true
   },
   "reporting": {
-    "enabled": true,
-    "directory": "reports",
     "formats": [
       "html",
       "json"
-    ]
+    ],
+    "directory": "output/reports"
   }
 }

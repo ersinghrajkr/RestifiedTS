@@ -1,181 +1,58 @@
-# test-enhanced
+# RestifiedTS Project
 
-API testing project built with RestifiedTS framework.
+This project was initialized with RestifiedTS CLI for API testing.
 
-## 🚀 Quick Start
+## Getting Started
 
-### Installation
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
 
-This project comes with RestifiedTS and all necessary dependencies pre-configured. Just install:
+2. Update configuration in `config/default.json` with your API settings.
 
-```bash
-npm install
-```
+3. Run the sample tests:
+   ```bash
+   npm test
+   ```
 
-### Run Tests
+## Project Structure
 
-```bash
-# Run all tests and generate HTML report
-npm test
+- `tests/integration/` - Integration tests for APIs
+- `tests/unit/` - Unit tests
+- `tests/setup/` - Global setup and teardown
+- `tests/fixtures/` - Test data and utilities
+- `config/` - Environment-specific configurations
 
-# Run specific test suites
-npm run test:unit
-npm run test:integration
-npm run test:smoke
+## Commands
 
-# Run comprehensive test suite with merged report
-npm run test:comprehensive
+- `npm test` - Run all tests
+- `npm run test:unit` - Run unit tests only
+- `npm run test:integration` - Run integration tests only
+- `npm run test:smoke` - Run smoke tests (@smoke tagged)
+- `npm run test:regression` - Run regression tests (@regression tagged)
+- `npm run test:coverage` - Run tests with coverage report
 
-# Watch mode for development
-npm run test:watch
-```
+## Generating New Tests
 
-### Generate Reports
-
-```bash
-# Basic HTML report (auto-generated after tests)
-npm run test:report
-
-# Comprehensive report with all test suites
-npm run test:report:comprehensive
-
-# Using RestifiedTS CLI directly
-npx restifiedts report --comprehensive --open
-```
-
-## 📁 Project Structure
-
-```
-test-enhanced/
-├── tests/
-│   ├── unit/           # Unit tests
-│   ├── integration/    # Integration tests
-│   └── setup/          # Test setup and utilities
-├── config/             # Configuration files
-├── reports/            # Generated test reports
-├── .env.example        # Environment variables template
-├── tsconfig.json       # TypeScript configuration
-├── package.json        # Dependencies and scripts
-└── README.md          # This file
-```
-
-## ⚙️ Configuration
-
-### Environment Variables
-
-Copy `.env.example` to `.env` and update with your API settings:
+Use RestifiedTS CLI to generate new test files:
 
 ```bash
-cp .env.example .env
-```
-
-### Configuration Files
-
-- `config/default.json` - Base configuration
-- `config/development.json` - Development overrides
-- `config/production.json` - Production settings
-
-## 🧪 Writing Tests
-
-### Basic API Test
-
-```typescript
-import { restified } from 'restifiedts';
-import { expect } from 'chai';
-
-describe('API Tests', function() {
-  afterAll(async function() {
-    await restified.cleanup();
-  });
-
-  it('should test API endpoint', async function() {
-    const response = await restified
-      .given()
-        .baseURL(process.env.API_BASE_URL)
-        .bearerToken(process.env.AUTH_TOKEN)
-      .when()
-        .get('/users')
-        .execute();
-
-    await response
-      .statusCode(200)
-      .jsonPath('$[0].id').isNumber()
-      .execute();
-  });
-});
-```
-
-### Generate New Tests
-
-```bash
-# Generate different types of tests
+# Generate API test
 npx restifiedts generate --type api --name UserAPI
-npx restifiedts generate --type database --name UserDatabase
-npx restifiedts generate --type performance --name LoadTest
-npx restifiedts generate --type security --name SecurityScan
-npx restifiedts generate --type unified --name ComprehensiveTest
+
+# Generate GraphQL test
+npx restifiedts generate --type graphql --name UserGraphQL
+
+# Scaffold complete service
+npx restifiedts scaffold --service UserService --include-graphql
 ```
 
-## 📊 Available Reports
+## Documentation
 
-After running tests, you'll find HTML reports in the `reports/` directory:
+- [RestifiedTS Documentation](https://github.com/restifiedts)
+- [API Testing Best Practices](https://github.com/restifiedts/docs)
 
-- `test-report.html` - Standard test results
-- `comprehensive-report.html` - All test suites combined
-- `performance-report.html` - Performance metrics (if available)
-- `security-report.html` - Security findings (if available)
+## License
 
-## 🔧 Development
-
-### Code Quality
-
-```bash
-# Linting
-npm run lint
-
-# Code formatting
-npm run format
-```
-
-### Clean Reports
-
-```bash
-npm run test:clean
-```
-
-## 🆘 Troubleshooting
-
-### Common Issues
-
-**Tests hang after completion?**
-➜ Ensure you have `await restified.cleanup()` in `afterAll()`
-
-**Environment variables not loading?**
-➜ Copy `.env.example` to `.env` and update values
-
-**TypeScript errors?**
-➜ Check `tsconfig.json` configuration
-
-**Reports not generating?**
-➜ Ensure `reports/` directory exists and has write permissions
-
-### Debug Mode
-
-Set `LOG_LEVEL=debug` in your `.env` file for detailed logging.
-
-## 📚 Documentation
-
-- [RestifiedTS Documentation](https://github.com/ersinghrajkr/RestifiedTS)
-- [Complete Guide](https://github.com/ersinghrajkr/RestifiedTS/blob/main/RESTIFIEDTS-GUIDE.md)
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create your feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
-
----
-
-Generated by RestifiedTS CLI v1.1.0
+MIT
