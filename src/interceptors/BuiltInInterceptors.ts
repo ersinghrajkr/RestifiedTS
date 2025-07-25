@@ -448,8 +448,8 @@ export class MonitoringInterceptor implements RequestInterceptor {
  * Built-in interceptor factory
  */
 export class BuiltInInterceptorFactory {
-  static createAuthenticationInterceptor(authProvider: any): AuthenticationInterceptor {
-    return new AuthenticationInterceptor(authProvider);
+  static createAuthenticationInterceptor(authProvider?: any): AuthenticationInterceptor {
+    return new AuthenticationInterceptor(authProvider || null);
   }
 
   static createRequestLoggingInterceptor(logger?: any): RequestLoggingInterceptor {

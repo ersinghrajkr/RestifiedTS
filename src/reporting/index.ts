@@ -12,6 +12,7 @@
 // Specialized reporters (HtmlReporter temporarily commented out due to type issues)
 // export { HtmlReporter } from './HtmlReporter';
 export { DiffReporter } from './DiffReporter';
+export { ReportingManager } from './ReportingManager';
 
 // Re-export reporting types for convenience
 export type {

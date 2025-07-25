@@ -25,7 +25,7 @@ export class SnapshotStore {
     ignoreFields?: string[];
     autoLoad?: boolean;
   } = {}) {
-    this.snapshotDir = options.snapshotDir || './snapshots';
+    this.snapshotDir = options.snapshotDir || './output/snapshots';
     this.updateMode = options.updateMode || false;
     this.ignoreFields = options.ignoreFields || [];
 

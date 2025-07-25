@@ -11,7 +11,7 @@
  */
 
 import { expect } from 'chai';
-import * as jsonpath from 'jsonpath';
+import { query as jsonpathQuery } from 'jsonpath';
 import { IncomingHttpHeaders } from 'http';
 import { 
   IThenStep, 
@@ -342,7 +342,7 @@ export class ThenStep implements IThenStep {
         throw this.error;
       }
       
-      const values = jsonpath.query(this.response?.data, path);
+      const values = jsonpathQuery(this.response?.data, path);
       
       if (typeof expectedValue === 'function') {
         expect(expectedValue(values[0])).to.be.true;
@@ -373,7 +373,7 @@ export class ThenStep implements IThenStep {
         throw this.error;
       }
       
-      const values = jsonpath.query(this.response?.data, path);
+      const values = jsonpathQuery(this.response?.data, path);
       expect(values).to.have.length.greaterThan(0);
       
       return {
@@ -399,7 +399,7 @@ export class ThenStep implements IThenStep {
         throw this.error;
       }
       
-      const values = jsonpath.query(this.response?.data, path);
+      const values = jsonpathQuery(this.response?.data, path);
       expect(values).to.have.length(0);
       
       return {
@@ -425,7 +425,7 @@ export class ThenStep implements IThenStep {
         throw this.error;
       }
       
-      const values = jsonpath.query(this.response?.data, path);
+      const values = jsonpathQuery(this.response?.data, path);
       expect(values[0]).to.match(pattern);
       
       return {
@@ -451,7 +451,7 @@ export class ThenStep implements IThenStep {
         throw this.error;
       }
       
-      const values = jsonpath.query(this.response?.data, path);
+      const values = jsonpathQuery(this.response?.data, path);
       expect(values).to.include(expectedValue);
       
       return {
@@ -648,7 +648,7 @@ export class ThenStep implements IThenStep {
         throw this.error;
       }
       
-      const values = jsonpath.query(this.response?.data, path);
+      const values = jsonpathQuery(this.response?.data, path);
       const extractedValue = values[0];
       
       this.variableStore.setLocal(variableName, extractedValue);

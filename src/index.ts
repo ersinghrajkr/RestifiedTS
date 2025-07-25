@@ -9,11 +9,16 @@
  * @license MIT
  */
 
+// Load environment variables from .env file
+import * as dotenv from 'dotenv';
+dotenv.config();
+
 // Core DSL exports
 export { RestifiedTS, restified } from './core/dsl/RestifiedTS';
 export { GivenStep } from './core/dsl/GivenStep';
 export { WhenStep } from './core/dsl/WhenStep';
 export { ThenStep } from './core/dsl/ThenStep';
+export { DatabaseStep } from './core/dsl/DatabaseStep';
 
 // Client exports
 export { 
@@ -35,6 +40,12 @@ export {
   SnapshotStore, 
   StorageManager 
 } from './core/stores';
+
+// Database exports
+export { 
+  DatabaseManager, 
+  DatabaseTestUtilities 
+} from './core/database';
 
 // Authentication exports
 export { 
@@ -71,11 +82,10 @@ export {
   TransportFactory
 } from './logging';
 
-// Reporting exports (ReportGenerator and HtmlReporter temporarily commented out due to type issues)
+// Reporting exports
 export {
-  // ReportGenerator,
-  // HtmlReporter,
-  DiffReporter
+  DiffReporter,
+  ReportingManager
 } from './reporting';
 
 // Type exports
@@ -133,8 +143,21 @@ export {
 export {
   TestGenerator,
   ProjectScaffolder,
-  ConfigGenerator
+  ConfigGenerator,
+  ModernTestGenerator
 } from './cli/cli';
+
+// Performance testing exports
+export { ArtilleryIntegration } from './performance/ArtilleryIntegration';
+
+// Security testing exports
+export { ZapIntegration } from './security/ZapIntegration';
+
+// Test orchestration exports
+export { UnifiedTestOrchestrator } from './orchestration/UnifiedTestOrchestrator';
+
+// Advanced validation exports
+export { SchemaValidationManager } from './validation/SchemaValidationManager';
 
 // Re-export for default
 import { RestifiedTS } from './core/dsl/RestifiedTS';

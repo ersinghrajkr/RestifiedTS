@@ -252,6 +252,23 @@ export class HttpClient {
    */
   cleanup(): void {
     this.performanceMetrics.clear();
+    
+    // Clean up axios instance if it has an HTTP agent
+    if (this.axiosInstance.defaults.httpAgent) {
+      try {
+        (this.axiosInstance.defaults.httpAgent as any).destroy();
+      } catch (error) {
+        // Ignore cleanup errors
+      }
+    }
+    
+    if (this.axiosInstance.defaults.httpsAgent) {
+      try {
+        (this.axiosInstance.defaults.httpsAgent as any).destroy();
+      } catch (error) {
+        // Ignore cleanup errors
+      }
+    }
   }
 }
 

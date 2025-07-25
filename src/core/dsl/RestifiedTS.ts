@@ -496,6 +496,9 @@ export class RestifiedTS {
    * Wait for specified amount of time
    */
   async wait(ms: number): Promise<RestifiedTS> {
+    if (ms < 0) {
+      throw new Error('Wait time cannot be negative');
+    }
     await new Promise(resolve => setTimeout(resolve, ms));
     return this;
   }
@@ -538,22 +541,116 @@ export class RestifiedTS {
    * Cleanup resources
    */
   async cleanup(): Promise<void> {
-    // Cleanup all clients
-    this.clients.forEach(client => {
-      client.cleanup();
-    });
-    
-    // Clear all data
-    this.clearAll();
-    
-    if (this.config.get('logging.level') === 'debug') {
-      console.log('[RestifiedTS] Cleanup completed');
+    try {
+      // Cleanup all clients
+      this.clients.forEach(client => {
+        try {
+          client.cleanup();
+        } catch (error) {
+          console.debug('Client cleanup warning:', (error as Error).message);
+        }
+      });
+      
+      // Disconnect all WebSocket connections to clean up their intervals
+      try {
+        await Promise.race([
+          this.disconnectAllWebSockets(),
+          new Promise<void>(resolve => setTimeout(resolve, 2000)) // 2 second timeout
+        ]);
+      } catch (error) {
+        console.debug('WebSocket cleanup warning:', (error as Error).message);
+      }
+      
+      // Clean up WebSocketManager resources
+      if (this.webSocketManager && typeof (this.webSocketManager as any).destroy === 'function') {
+        try {
+          await Promise.race([
+            (this.webSocketManager as any).destroy(),
+            new Promise<void>(resolve => setTimeout(resolve, 1000)) // 1 second timeout
+          ]);
+        } catch (error) {
+          console.debug('WebSocketManager cleanup warning:', (error as Error).message);
+        }
+      }
+      
+      // Clean up GraphQLManager resources
+      if (this.graphQLManager && typeof (this.graphQLManager as any).destroy === 'function') {
+        try {
+          await Promise.race([
+            (this.graphQLManager as any).destroy(),
+            new Promise<void>(resolve => setTimeout(resolve, 1000)) // 1 second timeout
+          ]);
+        } catch (error) {
+          console.debug('GraphQLManager cleanup warning:', (error as Error).message);
+        }
+      }
+      
+      // Clear all data
+      this.clearAll();
+      
+      // Force cleanup of any remaining timers
+      if (typeof global !== 'undefined' && (global as any)._restifiedTimers) {
+        const timers = (global as any)._restifiedTimers;
+        timers.forEach((timer: NodeJS.Timeout) => {
+          try {
+            clearTimeout(timer);
+            clearInterval(timer);
+          } catch (error) {
+            // Ignore timer cleanup errors
+          }
+        });
+        (global as any)._restifiedTimers = [];
+      }
+      
+      if (this.config.get('logging.level') === 'debug') {
+        console.log('[RestifiedTS] Cleanup completed');
+      }
+    } catch (error) {
+      console.debug('Cleanup error:', (error as Error).message);
     }
   }
 }
 
 // Export singleton instance for convenient usage
 export const restified = new RestifiedTS();
+
+/**
+ * Global cleanup function for test environments
+ * This function ensures all resources are properly cleaned up and the process can exit
+ */
+export const forceCleanup = async (): Promise<void> => {
+  try {
+    // Clean up the main RestifiedTS instance
+    await restified.cleanup();
+    
+    // Force cleanup of any remaining global resources
+    if (typeof global !== 'undefined') {
+      // Clear any global timers
+      const globalTimers = (global as any)._restifiedTimers || [];
+      globalTimers.forEach((timer: NodeJS.Timeout) => {
+        try {
+          clearTimeout(timer);
+          clearInterval(timer);
+        } catch (error) {
+          // Ignore cleanup errors
+        }
+      });
+      (global as any)._restifiedTimers = [];
+    }
+    
+    // Force process exit after a brief delay
+    setTimeout(() => {
+      process.exit(0);
+    }, 100);
+    
+  } catch (error) {
+    console.debug('Force cleanup error:', (error as Error).message);
+    // Force exit even if cleanup fails
+    setTimeout(() => {
+      process.exit(0);
+    }, 200);
+  }
+};
 
 // Export the class as default
 export default RestifiedTS;

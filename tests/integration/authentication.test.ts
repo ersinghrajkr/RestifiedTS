@@ -10,15 +10,17 @@ describe('Authentication Integration Tests @integration @smoke', () => {
       try {
         const bearerToken = 'test-bearer-token-12345';
         
-        const result = await restified
+        const thenStep = await restified
           .given()
             .baseURL('https://httpbin.org')
             .bearerToken(bearerToken)
           .when()
             .get('/bearer')
-          .then()
+            .execute();
+
+        const result = await thenStep
             .statusCode(200)
-          .execute();
+            .execute();
 
         expect(result.status).to.equal(200);
         expect(result.data).to.have.property('authenticated', true);
@@ -34,15 +36,17 @@ describe('Authentication Integration Tests @integration @smoke', () => {
       this.timeout(8000);
       
       try {
-        const result = await restified
+        const thenStep = await restified
           .given()
             .baseURL('https://httpbin.org')
             .bearerToken('invalid-token')
           .when()
             .get('/bearer')
-          .then()
+            .execute();
+
+        const result = await thenStep
             .statusCode(401)
-          .execute();
+            .execute();
 
         expect(result.status).to.equal(401);
 
@@ -58,15 +62,17 @@ describe('Authentication Integration Tests @integration @smoke', () => {
       try {
         const customToken = 'custom-bearer-token';
         
-        const result = await restified
+        const thenStep = await restified
           .given()
             .baseURL('https://httpbin.org')
             .header('X-Custom-Auth', `Bearer ${customToken}`)
           .when()
             .get('/headers')
-          .then()
+            .execute();
+
+        const result = await thenStep
             .statusCode(200)
-          .execute();
+            .execute();
 
         expect(result.status).to.equal(200);
         expect(result.data.headers).to.have.property('X-Custom-Auth', `Bearer ${customToken}`);
@@ -86,15 +92,17 @@ describe('Authentication Integration Tests @integration @smoke', () => {
         const username = 'testuser';
         const password = 'testpass';
         
-        const result = await restified
+        const thenStep = await restified
           .given()
             .baseURL('https://httpbin.org')
             .basicAuth(username, password)
           .when()
             .get(`/basic-auth/${username}/${password}`)
-          .then()
+            .execute();
+
+        const result = await thenStep
             .statusCode(200)
-          .execute();
+            .execute();
 
         expect(result.status).to.equal(200);
         expect(result.data).to.have.property('authenticated', true);
@@ -110,15 +118,17 @@ describe('Authentication Integration Tests @integration @smoke', () => {
       this.timeout(8000);
       
       try {
-        const result = await restified
+        const thenStep = await restified
           .given()
             .baseURL('https://httpbin.org')
             .basicAuth('wronguser', 'wrongpass')
           .when()
             .get('/basic-auth/testuser/testpass')
-          .then()
+            .execute();
+
+        const result = await thenStep
             .statusCode(401)
-          .execute();
+            .execute();
 
         expect(result.status).to.equal(401);
 
@@ -135,15 +145,17 @@ describe('Authentication Integration Tests @integration @smoke', () => {
         const username = 'user with spaces';
         const password = 'pass@word#123';
         
-        const result = await restified
+        const thenStep = await restified
           .given()
             .baseURL('https://httpbin.org')
             .basicAuth(username, password)
           .when()
             .get('/headers')
-          .then()
+            .execute();
+
+        const result = await thenStep
             .statusCode(200)
-          .execute();
+            .execute();
 
         expect(result.status).to.equal(200);
         expect(result.data.headers).to.have.property('Authorization');
@@ -163,15 +175,17 @@ describe('Authentication Integration Tests @integration @smoke', () => {
       try {
         const apiKey = 'test-api-key-12345';
         
-        const result = await restified
+        const thenStep = await restified
           .given()
             .baseURL('https://httpbin.org')
             .apiKey(apiKey)
           .when()
             .get('/headers')
-          .then()
+            .execute();
+
+        const result = await thenStep
             .statusCode(200)
-          .execute();
+            .execute();
 
         expect(result.status).to.equal(200);
         expect(result.data).to.have.property('headers');
@@ -190,15 +204,17 @@ describe('Authentication Integration Tests @integration @smoke', () => {
         const apiKey = 'custom-api-key-67890';
         const headerName = 'X-Custom-API-Key';
         
-        const result = await restified
+        const thenStep = await restified
           .given()
             .baseURL('https://httpbin.org')
             .apiKey(apiKey, headerName)
           .when()
             .get('/headers')
-          .then()
+            .execute();
+
+        const result = await thenStep
             .statusCode(200)
-          .execute();
+            .execute();
 
         expect(result.status).to.equal(200);
         expect(result.data).to.have.property('headers');
@@ -216,15 +232,17 @@ describe('Authentication Integration Tests @integration @smoke', () => {
       try {
         const apiKey = 'test-query-api-key';
         
-        const result = await restified
+        const thenStep = await restified
           .given()
             .baseURL('https://httpbin.org')
             .queryParam('api_key', apiKey)
           .when()
             .get('/get')
-          .then()
+            .execute();
+
+        const result = await thenStep
             .statusCode(200)
-          .execute();
+            .execute();
 
         expect(result.status).to.equal(200);
         expect(result.data).to.have.property('args');
@@ -242,7 +260,7 @@ describe('Authentication Integration Tests @integration @smoke', () => {
       this.timeout(8000);
       
       try {
-        const result = await restified
+        const thenStep = await restified
           .given()
             .baseURL('https://httpbin.org')
             .header('Authorization', 'Bearer primary-token')
@@ -250,9 +268,11 @@ describe('Authentication Integration Tests @integration @smoke', () => {
             .header('X-Custom-Auth', 'custom-auth-value')
           .when()
             .get('/headers')
-          .then()
+            .execute();
+
+        const result = await thenStep
             .statusCode(200)
-          .execute();
+            .execute();
 
         expect(result.status).to.equal(200);
         expect(result.data.headers).to.have.property('Authorization', 'Bearer primary-token');
@@ -269,16 +289,18 @@ describe('Authentication Integration Tests @integration @smoke', () => {
       this.timeout(8000);
       
       try {
-        const result = await restified
+        const thenStep = await restified
           .given()
             .baseURL('https://httpbin.org')
             .contextVariable('authToken', 'dynamic-token-12345')
             .header('Authorization', 'Bearer {{authToken}}')
           .when()
             .get('/headers')
-          .then()
+            .execute();
+
+        const result = await thenStep
             .statusCode(200)
-          .execute();
+            .execute();
 
         expect(result.status).to.equal(200);
         expect(result.data.headers).to.have.property('Authorization', 'Bearer dynamic-token-12345');
@@ -293,16 +315,18 @@ describe('Authentication Integration Tests @integration @smoke', () => {
       this.timeout(8000);
       
       try {
-        const result = await restified
+        const thenStep = await restified
           .given()
             .baseURL('https://httpbin.org')
             .contextVariable('tokenValue', 'templated-token-xyz')
             .bearerToken('{{tokenValue}}')
           .when()
             .get('/headers')
-          .then()
+            .execute();
+
+        const result = await thenStep
             .statusCode(200)
-          .execute();
+            .execute();
 
         expect(result.status).to.equal(200);
         expect(result.data.headers).to.have.property('Authorization', 'Bearer templated-token-xyz');
@@ -317,16 +341,18 @@ describe('Authentication Integration Tests @integration @smoke', () => {
       this.timeout(8000);
       
       try {
-        const result = await restified
+        const thenStep = await restified
           .given()
             .baseURL('https://httpbin.org')
             .contextVariable('keyValue', 'templated-api-key-123')
             .apiKey('{{keyValue}}', 'X-Template-Key')
           .when()
             .get('/headers')
-          .then()
+            .execute();
+
+        const result = await thenStep
             .statusCode(200)
-          .execute();
+            .execute();
 
         expect(result.status).to.equal(200);
         expect(result.data.headers).to.have.property('X-Template-Key', 'templated-api-key-123');
@@ -344,16 +370,18 @@ describe('Authentication Integration Tests @integration @smoke', () => {
       
       try {
         // Mock OAuth2 token request
-        const tokenResponse = await restified
+        const tokenThenStep = await restified
           .given()
             .baseURL('https://httpbin.org')
             .contentType('application/x-www-form-urlencoded')
             .body('grant_type=client_credentials&client_id=test&client_secret=secret')
           .when()
             .post('/post')
-          .then()
+            .execute();
+
+        const tokenResponse = await tokenThenStep
             .statusCode(200)
-          .execute();
+            .execute();
 
         expect(tokenResponse.status).to.equal(200);
         expect(tokenResponse.data).to.have.property('form');
@@ -361,15 +389,17 @@ describe('Authentication Integration Tests @integration @smoke', () => {
         
         // Simulate using the obtained token
         const mockToken = 'oauth2-access-token-from-response';
-        const apiResult = await restified
+        const apiThenStep = await restified
           .given()
             .baseURL('https://httpbin.org')
             .bearerToken(mockToken)
           .when()
             .get('/bearer')
-          .then()
+            .execute();
+
+        const apiResult = await apiThenStep
             .statusCode(200)
-          .execute();
+            .execute();
 
         expect(apiResult.data.token).to.equal(mockToken);
 
@@ -383,16 +413,18 @@ describe('Authentication Integration Tests @integration @smoke', () => {
       this.timeout(10000);
       
       try {
-        const refreshTokenRequest = await restified
+        const refreshThenStep = await restified
           .given()
             .baseURL('https://httpbin.org')
             .contentType('application/x-www-form-urlencoded')
             .body('grant_type=refresh_token&refresh_token=mock-refresh-token')
           .when()
             .post('/post')
-          .then()
+            .execute();
+
+        const refreshTokenRequest = await refreshThenStep
             .statusCode(200)
-          .execute();
+            .execute();
 
         expect(refreshTokenRequest.status).to.equal(200);
         expect(refreshTokenRequest.data).to.have.property('form');
@@ -411,16 +443,18 @@ describe('Authentication Integration Tests @integration @smoke', () => {
       this.timeout(10000);
       
       try {
-        const result = await restified
+        const thenStep = await restified
           .given()
             .baseURL('https://httpbin.org')
             .bearerToken('test-token')
             .timeout(1000) // Very short timeout
           .when()
             .get('/delay/5') // 5 second delay endpoint
-          .then()
+            .execute();
+
+        const result = await thenStep
             .statusCode(200)
-          .execute();
+            .execute();
 
         expect.fail('Request should have timed out');
 
@@ -435,15 +469,17 @@ describe('Authentication Integration Tests @integration @smoke', () => {
       this.timeout(8000);
       
       try {
-        const result = await restified
+        const thenStep = await restified
           .given()
             .baseURL('https://httpbin.org')
             .header('Authorization', 'Malformed auth header')
           .when()
             .get('/headers')
-          .then()
+            .execute();
+
+        const result = await thenStep
             .statusCode(200)
-          .execute();
+            .execute();
 
         expect(result.status).to.equal(200);
         expect(result.data.headers).to.have.property('Authorization', 'Malformed auth header');
@@ -458,16 +494,18 @@ describe('Authentication Integration Tests @integration @smoke', () => {
       this.timeout(8000);
       
       try {
-        const result = await restified
+        const thenStep = await restified
           .given()
             .baseURL('https://invalid-domain-that-does-not-exist-12345.com')
             .bearerToken('test-token')
             .timeout(3000)
           .when()
             .get('/api/test')
-          .then()
+            .execute();
+
+        const result = await thenStep
             .statusCode(200)
-          .execute();
+            .execute();
 
         expect.fail('Request should have failed due to invalid domain');
 
@@ -484,7 +522,7 @@ describe('Authentication Integration Tests @integration @smoke', () => {
       this.timeout(8000);
       
       try {
-        const result = await restified
+        const thenStep = await restified
           .given()
             .baseURL('https://httpbin.org')
             .bearerToken('primary-bearer-token')
@@ -492,9 +530,11 @@ describe('Authentication Integration Tests @integration @smoke', () => {
             .header('X-Client-Id', 'client-12345')
           .when()
             .get('/headers')
-          .then()
+            .execute();
+
+        const result = await thenStep
             .statusCode(200)
-          .execute();
+            .execute();
 
         expect(result.status).to.equal(200);
         expect(result.data.headers).to.have.property('Authorization', 'Bearer primary-bearer-token');
@@ -511,16 +551,18 @@ describe('Authentication Integration Tests @integration @smoke', () => {
       this.timeout(8000);
       
       try {
-        const result = await restified
+        const thenStep = await restified
           .given()
             .baseURL('https://httpbin.org')
             .bearerToken('first-token')
             .bearerToken('final-token') // Should override the first one
           .when()
             .get('/headers')
-          .then()
+            .execute();
+
+        const result = await thenStep
             .statusCode(200)
-          .execute();
+            .execute();
 
         expect(result.status).to.equal(200);
         expect(result.data.headers).to.have.property('Authorization', 'Bearer final-token');

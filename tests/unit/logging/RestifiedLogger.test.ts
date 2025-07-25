@@ -3,9 +3,23 @@ import { RestifiedLogger } from '../../../src/logging/RestifiedLogger';
 
 describe('RestifiedTS Logging System Tests @smoke @unit', () => {
   let logger: RestifiedLogger;
+  const loggersToCleanup: RestifiedLogger[] = [];
 
   beforeEach(() => {
     logger = new RestifiedLogger();
+    loggersToCleanup.push(logger);
+  });
+
+  afterEach(() => {
+    // Clean up all loggers created during tests
+    loggersToCleanup.forEach(logger => {
+      try {
+        logger.destroy();
+      } catch (error) {
+        // Ignore cleanup errors
+      }
+    });
+    loggersToCleanup.length = 0; // Clear the array
   });
 
   describe('Logger Initialization', () => {
@@ -15,6 +29,7 @@ describe('RestifiedTS Logging System Tests @smoke @unit', () => {
 
     it('should initialize with default configuration', () => {
       const defaultLogger = new RestifiedLogger();
+      loggersToCleanup.push(defaultLogger);
       expect(defaultLogger).to.be.instanceOf(RestifiedLogger);
     });
 

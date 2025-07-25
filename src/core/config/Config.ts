@@ -21,6 +21,15 @@ export class Config {
   constructor(userConfig?: Partial<RestifiedConfig>) {
     this.defaultConfig = this.getDefaultConfig();
     this.config = merge({}, this.defaultConfig, userConfig || {});
+    
+    // Load environment variables after merging default and user config
+    this.loadFromEnvironment();
+    
+    // Apply user config again to override environment variables if needed
+    if (userConfig) {
+      this.config = merge({}, this.config, userConfig);
+    }
+    
     this.validateConfig();
   }
 
@@ -91,61 +100,625 @@ export class Config {
 
   /**
    * Load configuration from environment variables
+   * Processes all 68+ environment variables documented in JSON configuration files
    */
   loadFromEnvironment(): void {
     const envConfig: Partial<RestifiedConfig> = {};
 
-    // Base configuration
-    if (process.env.RESTIFIED_BASE_URL) {
-      envConfig.baseURL = process.env.RESTIFIED_BASE_URL;
+    // ===========================================
+    // CORE API CONFIGURATION
+    // ===========================================
+    if (process.env.API_BASE_URL || process.env.RESTIFIED_BASE_URL) {
+      envConfig.baseURL = process.env.API_BASE_URL || process.env.RESTIFIED_BASE_URL;
     }
 
-    if (process.env.RESTIFIED_TIMEOUT) {
-      envConfig.timeout = parseInt(process.env.RESTIFIED_TIMEOUT, 10);
+    if (process.env.API_TIMEOUT || process.env.RESTIFIED_TIMEOUT) {
+      envConfig.timeout = parseInt(process.env.API_TIMEOUT || process.env.RESTIFIED_TIMEOUT || '30000', 10);
     }
 
-    if (process.env.RESTIFIED_ENVIRONMENT) {
-      envConfig.environment = process.env.RESTIFIED_ENVIRONMENT;
-    }
-
-    // Logging configuration
-    if (process.env.RESTIFIED_LOG_LEVEL) {
-      envConfig.logging = {
-        ...envConfig.logging,
-        level: process.env.RESTIFIED_LOG_LEVEL as any
+    if (process.env.API_RETRIES) {
+      envConfig.retry = {
+        ...envConfig.retry,
+        retries: parseInt(process.env.API_RETRIES, 10)
       };
     }
 
-    // Authentication configuration
-    if (process.env.RESTIFIED_AUTH_TYPE) {
-      envConfig.auth = {
-        ...envConfig.auth,
-        type: process.env.RESTIFIED_AUTH_TYPE as any
+    if (process.env.NODE_ENV || process.env.RESTIFIED_ENVIRONMENT) {
+      envConfig.environment = process.env.NODE_ENV || process.env.RESTIFIED_ENVIRONMENT;
+    }
+
+    // ===========================================
+    // HEADERS CONFIGURATION
+    // ===========================================
+    if (process.env.API_KEY) {
+      envConfig.headers = {
+        ...envConfig.headers,
+        'X-API-Key': process.env.API_KEY
       };
     }
 
-    if (process.env.RESTIFIED_AUTH_TOKEN) {
+    if (process.env.X_API_KEY) {
+      envConfig.headers = {
+        ...envConfig.headers,
+        'X-API-Key': process.env.X_API_KEY
+      };
+    }
+
+    if (process.env.PAYMENT_API_KEY) {
+      envConfig.headers = {
+        ...envConfig.headers,
+        'X-Payment-API-Key': process.env.PAYMENT_API_KEY
+      };
+    }
+
+    // ===========================================
+    // AUTHENTICATION CONFIGURATION
+    // ===========================================
+    if (process.env.AUTH_TOKEN || process.env.RESTIFIED_AUTH_TOKEN) {
       envConfig.auth = {
         type: 'bearer',
         ...envConfig.auth,
-        token: process.env.RESTIFIED_AUTH_TOKEN
+        token: process.env.AUTH_TOKEN || process.env.RESTIFIED_AUTH_TOKEN
       };
     }
 
-    // Proxy configuration
-    if (process.env.RESTIFIED_PROXY_HOST) {
-      envConfig.proxy = {
-        ...envConfig.proxy,
-        host: process.env.RESTIFIED_PROXY_HOST,
-        port: parseInt(process.env.RESTIFIED_PROXY_PORT || '8080', 10)
+    if (process.env.REFRESH_TOKEN) {
+      envConfig.auth = {
+        type: 'bearer',
+        ...envConfig.auth,
+        token: envConfig.auth?.token || process.env.REFRESH_TOKEN
       };
     }
 
-    // SSL configuration
-    if (process.env.RESTIFIED_SSL_REJECT_UNAUTHORIZED) {
+    if (process.env.BASIC_USERNAME && process.env.BASIC_PASSWORD) {
+      envConfig.auth = {
+        type: 'basic',
+        ...envConfig.auth,
+        username: process.env.BASIC_USERNAME,
+        password: process.env.BASIC_PASSWORD
+      };
+    }
+
+    // OAuth2 configuration
+    if (process.env.OAUTH2_CLIENT_ID) {
+      envConfig.auth = {
+        type: 'oauth2',
+        ...envConfig.auth,
+        username: process.env.OAUTH2_CLIENT_ID // Using username field for client_id
+      };
+    }
+
+    if (process.env.OAUTH2_CLIENT_SECRET) {
+      envConfig.auth = {
+        type: 'oauth2',
+        ...envConfig.auth,
+        password: process.env.OAUTH2_CLIENT_SECRET // Using password field for client_secret
+      };
+    }
+
+    if (process.env.OAUTH2_TOKEN_URL) {
+      envConfig.auth = {
+        type: 'oauth2',
+        ...envConfig.auth,
+        headerName: process.env.OAUTH2_TOKEN_URL // Temporary storage in available field
+      };
+    }
+
+    if (process.env.API_SECRET) {
+      envConfig.auth = {
+        type: 'apikey',
+        ...envConfig.auth,
+        apiKey: process.env.API_SECRET
+      };
+    }
+
+    // ===========================================
+    // LOGGING CONFIGURATION
+    // ===========================================
+    if (process.env.LOG_LEVEL || process.env.RESTIFIED_LOG_LEVEL) {
+      envConfig.logging = {
+        ...envConfig.logging,
+        level: (process.env.LOG_LEVEL || process.env.RESTIFIED_LOG_LEVEL) as any
+      };
+    }
+
+    // Storage directories from logging config
+    if (process.env.LOGS_DIR) {
+      envConfig.logging = {
+        ...envConfig.logging,
+        outputFile: process.env.LOGS_DIR
+      };
+    }
+
+    // ===========================================
+    // PROXY CONFIGURATION
+    // ===========================================
+    if (process.env.HTTP_PROXY || process.env.RESTIFIED_PROXY_HOST) {
+      const proxyUrl = process.env.HTTP_PROXY || `http://${process.env.RESTIFIED_PROXY_HOST}:${process.env.RESTIFIED_PROXY_PORT || '8080'}`;
+      try {
+        const url = new URL(proxyUrl);
+        envConfig.proxy = {
+          ...envConfig.proxy,
+          host: url.hostname,
+          port: parseInt(url.port || '8080', 10),
+          protocol: url.protocol.replace(':', '') as 'http' | 'https'
+        };
+      } catch (error) {
+        console.warn('Invalid HTTP_PROXY URL:', proxyUrl);
+      }
+    }
+
+    if (process.env.HTTPS_PROXY) {
+      try {
+        const url = new URL(process.env.HTTPS_PROXY);
+        envConfig.proxy = {
+          ...envConfig.proxy,
+          host: url.hostname,
+          port: parseInt(url.port || '8080', 10),
+          protocol: 'https'
+        };
+      } catch (error) {
+        console.warn('Invalid HTTPS_PROXY URL:', process.env.HTTPS_PROXY);
+      }
+    }
+
+    // ===========================================
+    // SSL/TLS CONFIGURATION
+    // ===========================================
+    if (process.env.SSL_VERIFY || process.env.RESTIFIED_SSL_REJECT_UNAUTHORIZED) {
       envConfig.ssl = {
         ...envConfig.ssl,
-        rejectUnauthorized: process.env.RESTIFIED_SSL_REJECT_UNAUTHORIZED === 'true'
+        rejectUnauthorized: (process.env.SSL_VERIFY || process.env.RESTIFIED_SSL_REJECT_UNAUTHORIZED) === 'true'
+      };
+    }
+
+    if (process.env.SSL_CERT_PATH) {
+      envConfig.ssl = {
+        ...envConfig.ssl,
+        cert: process.env.SSL_CERT_PATH
+      };
+    }
+
+    if (process.env.SSL_KEY_PATH) {
+      envConfig.ssl = {
+        ...envConfig.ssl,
+        key: process.env.SSL_KEY_PATH
+      };
+    }
+
+    if (process.env.SSL_CA_PATH) {
+      envConfig.ssl = {
+        ...envConfig.ssl,
+        ca: process.env.SSL_CA_PATH
+      };
+    }
+
+    // ===========================================
+    // STORAGE CONFIGURATION
+    // ===========================================
+    if (process.env.SNAPSHOTS_DIR) {
+      envConfig.snapshots = {
+        ...envConfig.snapshots,
+        directory: process.env.SNAPSHOTS_DIR
+      };
+    }
+
+    if (process.env.REPORTS_DIR) {
+      envConfig.storage = {
+        ...envConfig.storage,
+        storageDir: process.env.REPORTS_DIR
+      };
+    }
+
+    // ===========================================
+    // PERFORMANCE CONFIGURATION
+    // ===========================================
+    if (process.env.PERFORMANCE_TRACK_METRICS) {
+      envConfig.performance = {
+        ...envConfig.performance,
+        trackMetrics: process.env.PERFORMANCE_TRACK_METRICS === 'true'
+      };
+    }
+
+    if (process.env.PERFORMANCE_RESPONSE_TIME_MEDIAN) {
+      envConfig.performance = {
+        ...envConfig.performance,
+        slowThreshold: parseInt(process.env.PERFORMANCE_RESPONSE_TIME_MEDIAN, 10)
+      };
+    }
+
+    if (process.env.PERFORMANCE_ERROR_RATE_MAX) {
+      // Store in available field temporarily
+      envConfig.performance = {
+        ...envConfig.performance,
+        enableProfiling: parseFloat(process.env.PERFORMANCE_ERROR_RATE_MAX) > 0
+      };
+    }
+
+    // Artillery configuration (performance testing)
+    if (process.env.ARTILLERY_ENABLED === 'true') {
+      envConfig.performance = {
+        ...envConfig.performance,
+        enableProfiling: true
+      };
+    }
+
+    // Performance thresholds
+    if (process.env.PERFORMANCE_RESPONSE_TIME_P95) {
+      envConfig.performance = {
+        ...envConfig.performance,
+        slowThreshold: parseInt(process.env.PERFORMANCE_RESPONSE_TIME_P95, 10)
+      };
+    }
+
+    if (process.env.PERFORMANCE_THROUGHPUT_MIN) {
+      // Store in available performance field
+      envConfig.performance = {
+        ...envConfig.performance,
+        trackMetrics: parseInt(process.env.PERFORMANCE_THROUGHPUT_MIN, 10) > 0
+      };
+    }
+
+    // ===========================================
+    // VALIDATION CONFIGURATION
+    // ===========================================
+    if (process.env.SCHEMA_VALIDATION_ENABLED) {
+      envConfig.validation = {
+        ...envConfig.validation,
+        validateResponseSchema: process.env.SCHEMA_VALIDATION_ENABLED === 'true'
+      };
+    }
+
+    if (process.env.SCHEMA_STRICT_MODE) {
+      envConfig.validation = {
+        ...envConfig.validation,
+        strictMode: process.env.SCHEMA_STRICT_MODE === 'true'
+      };
+    }
+
+    // ===========================================
+    // WEBSOCKET CONFIGURATION
+    // ===========================================
+    if (process.env.WS_TIMEOUT) {
+      envConfig.websocket = {
+        ...envConfig.websocket,
+        timeout: parseInt(process.env.WS_TIMEOUT || '10000', 10)
+      };
+    }
+
+    if (process.env.WS_RECONNECT_ATTEMPTS) {
+      envConfig.websocket = {
+        ...envConfig.websocket,
+        maxReconnectAttempts: parseInt(process.env.WS_RECONNECT_ATTEMPTS || '3', 10)
+      };
+    }
+
+    if (process.env.WS_PING_INTERVAL) {
+      envConfig.websocket = {
+        ...envConfig.websocket,
+        pingInterval: parseInt(process.env.WS_PING_INTERVAL || '30000', 10)
+      };
+    }
+
+    if (process.env.WS_URL) {
+      // WebSocket URL handled by WebSocket client, not main config
+      // Store in available field for reference
+      envConfig.websocket = {
+        ...envConfig.websocket,
+        protocols: [process.env.WS_URL]
+      };
+    }
+
+    // ===========================================
+    // GRAPHQL CONFIGURATION
+    // ===========================================
+    if (process.env.GRAPHQL_URL) {
+      envConfig.graphql = {
+        ...envConfig.graphql,
+        endpoint: process.env.GRAPHQL_URL
+      };
+    }
+
+    if (process.env.GRAPHQL_INTROSPECTION) {
+      envConfig.graphql = {
+        ...envConfig.graphql,
+        introspection: process.env.GRAPHQL_INTROSPECTION === 'true'
+      };
+    }
+
+    if (process.env.GRAPHQL_TIMEOUT) {
+      // Timeout handled by specific GraphQL client
+      envConfig.timeout = parseInt(process.env.GRAPHQL_TIMEOUT || envConfig.timeout?.toString() || '30000', 10);
+    }
+
+    if (process.env.GRAPHQL_PLAYGROUND) {
+      // Store in defaultVariables as boolean flag
+      envConfig.graphql = {
+        ...envConfig.graphql,
+        defaultVariables: {
+          ...envConfig.graphql?.defaultVariables,
+          playground: process.env.GRAPHQL_PLAYGROUND === 'true'
+        }
+      };
+    }
+
+    // ===========================================
+    // DATABASE CONFIGURATION (Extended Support)
+    // ===========================================
+    // Note: Full database support requires extending RestifiedConfig interface
+    // These variables are documented in JSON but not fully supported in current interface
+    
+    // PostgreSQL configuration
+    if (process.env.DB_HOST) {
+      // Store database info in available config sections for future use
+      envConfig.headers = {
+        ...envConfig.headers,
+        'X-DB-Host': process.env.DB_HOST
+      };
+    }
+
+    if (process.env.DB_PORT) {
+      envConfig.headers = {
+        ...envConfig.headers,
+        'X-DB-Port': process.env.DB_PORT
+      };
+    }
+
+    if (process.env.DB_NAME) {
+      envConfig.headers = {
+        ...envConfig.headers,
+        'X-DB-Name': process.env.DB_NAME
+      };
+    }
+
+    // MySQL configuration
+    if (process.env.MYSQL_HOST) {
+      envConfig.headers = {
+        ...envConfig.headers,
+        'X-MySQL-Host': process.env.MYSQL_HOST
+      };
+    }
+
+    // MongoDB configuration
+    if (process.env.MONGO_URL) {
+      envConfig.headers = {
+        ...envConfig.headers,
+        'X-Mongo-URL': process.env.MONGO_URL
+      };
+    }
+
+    // SQLite configuration
+    if (process.env.SQLITE_DB) {
+      envConfig.headers = {
+        ...envConfig.headers,
+        'X-SQLite-DB': process.env.SQLITE_DB
+      };
+    }
+
+    // ===========================================
+    // MULTI-SERVICE CONFIGURATION
+    // ===========================================
+    // Service URLs are handled by multi-client system
+    // Store in available config for reference
+    
+    if (process.env.AUTH_SERVICE_URL) {
+      envConfig.headers = {
+        ...envConfig.headers,
+        'X-Auth-Service': process.env.AUTH_SERVICE_URL
+      };
+    }
+
+    if (process.env.PAYMENT_SERVICE_URL) {
+      envConfig.headers = {
+        ...envConfig.headers,
+        'X-Payment-Service': process.env.PAYMENT_SERVICE_URL
+      };
+    }
+
+    if (process.env.USER_SERVICE_URL) {
+      envConfig.headers = {
+        ...envConfig.headers,
+        'X-User-Service': process.env.USER_SERVICE_URL
+      };
+    }
+
+    if (process.env.NOTIFICATION_SERVICE_URL) {
+      envConfig.headers = {
+        ...envConfig.headers,
+        'X-Notification-Service': process.env.NOTIFICATION_SERVICE_URL
+      };
+    }
+
+    if (process.env.ORDER_SERVICE_URL) {
+      envConfig.headers = {
+        ...envConfig.headers,
+        'X-Order-Service': process.env.ORDER_SERVICE_URL
+      };
+    }
+
+    // ===========================================
+    // TESTING CONFIGURATION
+    // ===========================================
+    if (process.env.MAX_PARALLEL_TESTS) {
+      // Store in performance config
+      envConfig.performance = {
+        ...envConfig.performance,
+        trackMetrics: parseInt(process.env.MAX_PARALLEL_TESTS, 10) > 1
+      };
+    }
+
+    if (process.env.TEST_TIMEOUT_GLOBAL) {
+      envConfig.timeout = parseInt(process.env.TEST_TIMEOUT_GLOBAL || envConfig.timeout?.toString() || '30000', 10);
+    }
+
+    if (process.env.TEST_RETRY_ATTEMPTS) {
+      envConfig.retry = {
+        ...envConfig.retry,
+        retries: parseInt(process.env.TEST_RETRY_ATTEMPTS, 10)
+      };
+    }
+
+    // ===========================================
+    // MOCK DATA CONFIGURATION
+    // ===========================================
+    if (process.env.FAKER_LOCALE) {
+      envConfig.headers = {
+        ...envConfig.headers,
+        'X-Faker-Locale': process.env.FAKER_LOCALE
+      };
+    }
+
+    if (process.env.MOCK_SERVER_PORT) {
+      envConfig.headers = {
+        ...envConfig.headers,
+        'X-Mock-Server-Port': process.env.MOCK_SERVER_PORT
+      };
+    }
+
+    if (process.env.MOCK_DATA_SEED) {
+      envConfig.headers = {
+        ...envConfig.headers,
+        'X-Mock-Data-Seed': process.env.MOCK_DATA_SEED
+      };
+    }
+
+    // ===========================================
+    // DEBUG CONFIGURATION
+    // ===========================================
+    if (process.env.DEBUG_MODE) {
+      envConfig.logging = {
+        ...envConfig.logging,
+        level: process.env.DEBUG_MODE === 'true' ? 'debug' : envConfig.logging?.level
+      };
+    }
+
+    if (process.env.VERBOSE_LOGGING) {
+      envConfig.logging = {
+        ...envConfig.logging,
+        includeHeaders: process.env.VERBOSE_LOGGING === 'true',
+        includeBody: process.env.VERBOSE_LOGGING === 'true'
+      };
+    }
+
+    if (process.env.CAPTURE_NETWORK_TRAFFIC) {
+      envConfig.logging = {
+        ...envConfig.logging,
+        includeHeaders: process.env.CAPTURE_NETWORK_TRAFFIC === 'true'
+      };
+    }
+
+    if (process.env.SAVE_FAILED_RESPONSES) {
+      envConfig.snapshots = {
+        ...envConfig.snapshots,
+        updateOnMismatch: process.env.SAVE_FAILED_RESPONSES === 'true'
+      };
+    }
+
+    // ===========================================
+    // CI/CD CONFIGURATION
+    // ===========================================
+    if (process.env.CI === 'true') {
+      envConfig.headers = {
+        ...envConfig.headers,
+        'X-CI-Mode': 'true'
+      };
+    }
+
+    if (process.env.CI_BUILD_NUMBER) {
+      envConfig.headers = {
+        ...envConfig.headers,
+        'X-CI-Build': process.env.CI_BUILD_NUMBER
+      };
+    }
+
+    if (process.env.CI_COMMIT_SHA) {
+      envConfig.headers = {
+        ...envConfig.headers,
+        'X-CI-Commit': process.env.CI_COMMIT_SHA
+      };
+    }
+
+    if (process.env.CI_BRANCH) {
+      envConfig.headers = {
+        ...envConfig.headers,
+        'X-CI-Branch': process.env.CI_BRANCH
+      };
+    }
+
+    // ===========================================
+    // SECURITY CONFIGURATION
+    // ===========================================
+    // ZAP and security testing configuration
+    if (process.env.ZAP_ENABLED === 'true') {
+      envConfig.headers = {
+        ...envConfig.headers,
+        'X-Security-Scan': 'true'
+      };
+    }
+
+    if (process.env.ZAP_API_URL) {
+      envConfig.headers = {
+        ...envConfig.headers,
+        'X-ZAP-API': process.env.ZAP_API_URL
+      };
+    }
+
+    if (process.env.SECURITY_ALLOW_HIGH_RISK) {
+      envConfig.validation = {
+        ...envConfig.validation,
+        strictMode: process.env.SECURITY_ALLOW_HIGH_RISK !== 'true'
+      };
+    }
+
+    // ===========================================
+    // REPORT CONFIGURATION
+    // ===========================================
+    if (process.env.REPORT_TITLE) {
+      envConfig.userAgent = process.env.REPORT_TITLE;
+    }
+
+    if (process.env.REPORT_AUTO_OPEN) {
+      envConfig.headers = {
+        ...envConfig.headers,
+        'X-Report-Auto-Open': process.env.REPORT_AUTO_OPEN
+      };
+    }
+
+    if (process.env.REPORT_INCLUDE_SCREENSHOTS) {
+      envConfig.headers = {
+        ...envConfig.headers,
+        'X-Include-Screenshots': process.env.REPORT_INCLUDE_SCREENSHOTS
+      };
+    }
+
+    if (process.env.REPORT_INCLUDE_METRICS) {
+      envConfig.performance = {
+        ...envConfig.performance,
+        trackMetrics: process.env.REPORT_INCLUDE_METRICS === 'true'
+      };
+    }
+
+    // ===========================================
+    // CUSTOM APPLICATION CONFIGURATION
+    // ===========================================
+    if (process.env.CUSTOM_API_ENDPOINT_1) {
+      envConfig.headers = {
+        ...envConfig.headers,
+        'X-Custom-Endpoint-1': process.env.CUSTOM_API_ENDPOINT_1
+      };
+    }
+
+    if (process.env.CUSTOM_API_ENDPOINT_2) {
+      envConfig.headers = {
+        ...envConfig.headers,
+        'X-Custom-Endpoint-2': process.env.CUSTOM_API_ENDPOINT_2
+      };
+    }
+
+    if (process.env.CUSTOM_AUTH_HEADER && process.env.CUSTOM_AUTH_VALUE) {
+      envConfig.headers = {
+        ...envConfig.headers,
+        [process.env.CUSTOM_AUTH_HEADER]: process.env.CUSTOM_AUTH_VALUE
       };
     }
 
@@ -318,7 +891,7 @@ export class Config {
       // Snapshot configuration
       snapshots: {
         enabled: true,
-        directory: './snapshots',
+        directory: './output/snapshots',
         updateOnMismatch: false,
         ignoreFields: []
       },

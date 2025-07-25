@@ -544,6 +544,13 @@ export class GraphQLQueryBuilder {
   }
 
   /**
+   * Add a context variable (alias for variable method)
+   */
+  contextVariable(name: string, type: string, value: any): GraphQLQueryBuilder {
+    return this.variable(name, type, value);
+  }
+
+  /**
    * Build the GraphQL query string
    */
   build(): string {

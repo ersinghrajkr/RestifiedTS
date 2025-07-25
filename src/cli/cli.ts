@@ -8,6 +8,7 @@
 export { TestGenerator } from './TestGenerator';
 export { ProjectScaffolder } from './ProjectScaffolder';
 export { ConfigGenerator } from './ConfigGenerator';
+export { ModernTestGenerator } from './ModernTestGenerator';
 
 // Export interfaces for TypeScript users
 export type { ScaffoldOptions } from './ProjectScaffolder';

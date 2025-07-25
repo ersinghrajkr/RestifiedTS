@@ -1,0 +1,179 @@
+{
+  "userSchema": {
+    "type": "object",
+    "required": ["id", "name", "username", "email"],
+    "properties": {
+      "id": {
+        "type": "integer",
+        "minimum": 1
+      },
+      "name": {
+        "type": "string",
+        "minLength": 1
+      },
+      "username": {
+        "type": "string",
+        "minLength": 1
+      },
+      "email": {
+        "type": "string",
+        "format": "email"
+      },
+      "address": {
+        "type": "object",
+        "properties": {
+          "street": { "type": "string" },
+          "suite": { "type": "string" },
+          "city": { "type": "string" },
+          "zipcode": { "type": "string" },
+          "geo": {
+            "type": "object",
+            "properties": {
+              "lat": { "type": "string" },
+              "lng": { "type": "string" }
+            }
+          }
+        }
+      },
+      "phone": { "type": "string" },
+      "website": { "type": "string" },
+      "company": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "catchPhrase": { "type": "string" },
+          "bs": { "type": "string" }
+        }
+      }
+    }
+  },
+  "postSchema": {
+    "type": "object",
+    "required": ["id", "title", "body", "userId"],
+    "properties": {
+      "id": {
+        "type": "integer",
+        "minimum": 1
+      },
+      "title": {
+        "type": "string",
+        "minLength": 1
+      },
+      "body": {
+        "type": "string",
+        "minLength": 1
+      },
+      "userId": {
+        "type": "integer",
+        "minimum": 1
+      }
+    }
+  },
+  "postListSchema": {
+    "type": "array",
+    "items": {
+      "$ref": "#/postSchema"
+    },
+    "minItems": 1
+  },
+  "commentSchema": {
+    "type": "object",
+    "required": ["id", "name", "email", "body", "postId"],
+    "properties": {
+      "id": {
+        "type": "integer",
+        "minimum": 1
+      },
+      "name": {
+        "type": "string",
+        "minLength": 1
+      },
+      "email": {
+        "type": "string",
+        "format": "email"
+      },
+      "body": {
+        "type": "string",
+        "minLength": 1
+      },
+      "postId": {
+        "type": "integer",
+        "minimum": 1
+      }
+    }
+  },
+  "todoSchema": {
+    "type": "object",
+    "required": ["id", "title", "completed", "userId"],
+    "properties": {
+      "id": {
+        "type": "integer",
+        "minimum": 1
+      },
+      "title": {
+        "type": "string",
+        "minLength": 1
+      },
+      "completed": {
+        "type": "boolean"
+      },
+      "userId": {
+        "type": "integer",
+        "minimum": 1
+      }
+    }
+  },
+  "errorSchema": {
+    "type": "object",
+    "required": ["error", "message", "statusCode"],
+    "properties": {
+      "error": {
+        "type": "string"
+      },
+      "message": {
+        "type": "string"
+      },
+      "statusCode": {
+        "type": "integer",
+        "minimum": 400,
+        "maximum": 599
+      },
+      "details": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "field": { "type": "string" },
+            "message": { "type": "string" }
+          }
+        }
+      }
+    }
+  },
+  "paginationSchema": {
+    "type": "object",
+    "required": ["page", "limit", "total", "data"],
+    "properties": {
+      "page": {
+        "type": "integer",
+        "minimum": 1
+      },
+      "limit": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "total": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "pages": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "data": {
+        "type": "array"
+      }
+    }
+  }
+}

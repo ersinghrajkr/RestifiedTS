@@ -17,7 +17,14 @@
       "Bash(npm run test:*)",
       "Bash(mv:*)",
       "Bash(tail:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(npm test:*)",
+      "Bash(timeout 15 npm run test:clean)",
+      "Bash(set TS_NODE_PROJECT=tsconfig.test.json)",
+      "Bash(dir:*)",
+      "Bash(timeout 30s npx mocha --project tsconfig.test.json -r ts-node/register -r tsconfig-paths/register -r tests/helpers/cleanup-helper.ts \"tests/unit/logging/RestifiedLogger.test.ts\" --reporter spec)",
+      "Bash(timeout 300s npm test)",
+      "Bash(npm run cli:*)"
     ],
     "deny": []
   }

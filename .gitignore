@@ -6,9 +6,13 @@ yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
 
-#Reports
+# RestifiedTS Output (all generated content)
+output/
+
+# Legacy directories (now under output/)
 reports/
 snapshots/
+temp/
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 

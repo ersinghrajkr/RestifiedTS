@@ -3,9 +3,10 @@
 import { Command } from 'commander';
 import * as fs from 'fs';
 import * as path from 'path';
-import { TestGenerator } from './TestGenerator';
+import { ModernTestGenerator } from './ModernTestGenerator';
 import { ProjectScaffolder } from './ProjectScaffolder';
 import { ConfigGenerator } from './ConfigGenerator';
+import { UserReportGenerator } from './ReportGenerator';
 
 const program = new Command();
 
@@ -48,7 +49,7 @@ program
   .command('generate')
   .alias('gen')
   .description('Generate test files')
-  .requiredOption('-t, --type <type>', 'Test type (api, graphql, websocket, setup)')
+  .requiredOption('-t, --type <type>', 'Test type (api, auth, multi-client, performance, graphql, websocket, database, security, unified, validation)')
   .requiredOption('-n, --name <name>', 'Test name')
   .option('-o, --output <path>', 'Output directory', 'tests')
   .option('-b, --baseURL <url>', 'Base URL for API tests')
@@ -57,7 +58,7 @@ program
     console.log(`🔧 Generating ${options.type} test: ${options.name}...`);
     
     try {
-      const generator = new TestGenerator();
+      const generator = new ModernTestGenerator();
       const outputPath = await generator.generateTest({
         type: options.type,
         name: options.name,
@@ -155,20 +156,76 @@ program
     console.log('  - api: Basic REST API test template');
     console.log('  - crud: Full CRUD operation test suite');
     console.log('  - auth: Authentication flow tests');
+    console.log('  - multi-client: Multi-service integration tests');
     console.log('\n🔹 GraphQL Tests:');
     console.log('  - graphql: Basic GraphQL query/mutation tests');
-    console.log('  - graphql-schema: Schema validation tests');
     console.log('\n🔹 WebSocket Tests:');
     console.log('  - websocket: Basic WebSocket connection tests');
-    console.log('  - websocket-realtime: Real-time messaging tests');
+    console.log('\n🔹 Advanced Features:');
+    console.log('  - database: Database integration testing with state validation');
+    console.log('  - performance: Performance testing with Artillery integration');
+    console.log('  - security: Security testing with OWASP ZAP integration');
+    console.log('  - unified: Unified API + Performance + Security orchestration');
+    console.log('  - validation: Advanced schema validation with multiple validators');
     console.log('\n🔹 Setup/Teardown:');
     console.log('  - setup: Global setup and teardown template');
-    console.log('  - fixtures: Test data fixtures and utilities');
     
     console.log('\n💡 Example usage:');
     console.log('  npx restifiedts generate --type api --name UserAPI');
-    console.log('  npx restifiedts generate --type graphql --name UserGraphQL');
-    console.log('  npx restifiedts scaffold --service UserService --include-graphql');
+    console.log('  npx restifiedts generate --type database --name UserDatabase');
+    console.log('  npx restifiedts generate --type performance --name LoadTest');
+    console.log('  npx restifiedts generate --type security --name SecurityScan');
+    console.log('  npx restifiedts generate --type unified --name ComprehensiveTest');
+  });
+
+/**
+ * Generate test reports
+ */
+program
+  .command('report')
+  .description('Generate HTML test reports')
+  .option('-o, --output <path>', 'Output directory for reports', 'reports')
+  .option('-n, --name <name>', 'Report name', 'test-report')
+  .option('--open', 'Open report in browser after generation')
+  .option('--comprehensive', 'Generate comprehensive report with all test suites')
+  .option('--performance', 'Include performance report (if data available)')
+  .option('--security', 'Include security report (if data available)')
+  .action(async (options) => {
+    console.log('📊 Generating test reports...');
+    
+    try {
+      const reportGenerator = new UserReportGenerator();
+      
+      if (options.comprehensive) {
+        await reportGenerator.generateComprehensiveReport({
+          outputDir: options.output,
+          reportName: options.name,
+          openInBrowser: options.open
+        });
+      } else {
+        await reportGenerator.generateReport({
+          outputDir: options.output,
+          reportName: options.name,
+          openInBrowser: options.open
+        });
+      }
+
+      // Generate additional reports if requested
+      if (options.performance) {
+        await reportGenerator.generatePerformanceReport(options.output);
+      }
+
+      if (options.security) {
+        await reportGenerator.generateSecurityReport(options.output);
+      }
+      
+      console.log('✅ Reports generated successfully!');
+      console.log(`\n📁 Reports location: ${options.output}/`);
+      
+    } catch (error: any) {
+      console.error('❌ Failed to generate reports:', error.message);
+      process.exit(1);
+    }
   });
 
 /**
