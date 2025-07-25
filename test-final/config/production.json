@@ -1,6 +1,60 @@
 {
+  "api": {
+    "baseURL": "https://api.example.com",
+    "timeout": 30000,
+    "retries": 5
+  },
+  "database": {
+    "default": {
+      "host": "prod-db.example.com",
+      "port": 5432,
+      "ssl": true,
+      "pool": {
+        "min": 5,
+        "max": 50
+      }
+    }
+  },
   "logging": {
     "level": "warn",
-    "console": false
+    "console": false,
+    "file": {
+      "enabled": true,
+      "maxSize": "50MB",
+      "maxFiles": 10
+    }
+  },
+  "reporting": {
+    "html": {
+      "autoOpen": false,
+      "showPassed": false,
+      "showHooks": false
+    }
+  },
+  "snapshots": {
+    "updateSnapshots": false
+  },
+  "performance": {
+    "artillery": {
+      "enabled": false
+    },
+    "thresholds": {
+      "responseTime": {
+        "median": 300,
+        "p95": 500,
+        "p99": 1000
+      },
+      "errorRate": 0.1
+    }
+  },
+  "security": {
+    "zap": {
+      "enabled": false
+    },
+    "policies": {
+      "allowHighRisk": false,
+      "maxMediumRisk": 1,
+      "maxLowRisk": 5
+    }
   }
 }

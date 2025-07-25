@@ -1,0 +1,42 @@
+{
+  "posts": {
+    "singlePost": {
+      "userId": 1,
+      "id": 1,
+      "title": "sunt aut facere repellat provident occaecati excepturi optio reprehenderit",
+      "body": "quia et suscipit suscipit recusandae consequuntur expedita et cum reprehenderit molestiae ut ut quas totam nostrum rerum est autem sunt rem eveniet architecto"
+    },
+    "newPost": {
+      "title": "Test Post Title",
+      "body": "This is a test post body content",
+      "userId": 1
+    }
+  },
+  "comments": {
+    "singleComment": {
+      "postId": 1,
+      "id": 1,
+      "name": "id labore ex et quam laborum",
+      "email": "Eliseo@gardner.biz",
+      "body": "laudantium enim quasi est quidem magnam voluptate ipsam eos tempora quo necessitatibus dolor quam autem quasi reiciendis et nam sapiente accusantium"
+    }
+  },
+  "errors": {
+    "notFound": {
+      "error": "Not Found",
+      "message": "The requested resource was not found",
+      "statusCode": 404
+    },
+    "validation": {
+      "error": "Validation Error",
+      "message": "Request validation failed",
+      "statusCode": 422,
+      "details": [
+        {
+          "field": "email",
+          "message": "Email is required"
+        }
+      ]
+    }
+  }
+}

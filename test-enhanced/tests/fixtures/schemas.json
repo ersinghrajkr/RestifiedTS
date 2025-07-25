@@ -1,0 +1,91 @@
+{
+  "userSchema": {
+    "type": "object",
+    "required": [
+      "id",
+      "name",
+      "username",
+      "email"
+    ],
+    "properties": {
+      "id": {
+        "type": "integer",
+        "minimum": 1
+      },
+      "name": {
+        "type": "string",
+        "minLength": 1
+      },
+      "username": {
+        "type": "string",
+        "minLength": 1
+      },
+      "email": {
+        "type": "string",
+        "format": "email"
+      },
+      "address": {
+        "type": "object",
+        "properties": {
+          "street": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string"
+          },
+          "zipcode": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "postSchema": {
+    "type": "object",
+    "required": [
+      "id",
+      "title",
+      "body",
+      "userId"
+    ],
+    "properties": {
+      "id": {
+        "type": "integer",
+        "minimum": 1
+      },
+      "title": {
+        "type": "string",
+        "minLength": 1
+      },
+      "body": {
+        "type": "string",
+        "minLength": 1
+      },
+      "userId": {
+        "type": "integer",
+        "minimum": 1
+      }
+    }
+  },
+  "errorSchema": {
+    "type": "object",
+    "required": [
+      "error",
+      "message",
+      "statusCode"
+    ],
+    "properties": {
+      "error": {
+        "type": "string"
+      },
+      "message": {
+        "type": "string"
+      },
+      "statusCode": {
+        "type": "integer",
+        "minimum": 400,
+        "maximum": 599
+      }
+    }
+  }
+}

@@ -1,9 +1,45 @@
 {
   "api": {
-    "baseURL": "https://jsonplaceholder.typicode.com"
+    "baseURL": "https://dev-api.example.com",
+    "timeout": 45000
+  },
+  "database": {
+    "default": {
+      "host": "localhost",
+      "database": "dev_test_db",
+      "username": "dev_user",
+      "password": "dev_pass"
+    }
   },
   "logging": {
     "level": "debug",
     "console": true
+  },
+  "reporting": {
+    "html": {
+      "autoOpen": true,
+      "showHooks": true
+    }
+  },
+  "snapshots": {
+    "updateSnapshots": true
+  },
+  "performance": {
+    "artillery": {
+      "enabled": true,
+      "phases": [
+        {
+          "duration": 10,
+          "arrivalRate": 1,
+          "name": "dev-test"
+        }
+      ]
+    }
+  },
+  "security": {
+    "zap": {
+      "enabled": true,
+      "timeout": 60000
+    }
   }
 }

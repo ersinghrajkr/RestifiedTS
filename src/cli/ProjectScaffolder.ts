@@ -49,6 +49,7 @@ export class ProjectScaffolder {
     const filesToCreate = [
       { name: 'package.json', content: this.generatePackageJson(projectName) },
       { name: 'tsconfig.json', content: this.generateTsConfig() },
+      { name: '.mocharc.json', content: this.generateMochaConfig() },
       { name: '.eslintrc.json', content: this.generateEslintConfig() },
       { name: '.prettierrc.json', content: this.generatePrettierConfig() },
       { name: '.env.example', content: this.generateEnvTemplate() },
@@ -120,25 +121,52 @@ export class ProjectScaffolder {
   private async createSampleTests(projectRoot: string, force: boolean): Promise<void> {
     const testsDir = path.join(projectRoot, 'tests');
     
-    // Create setup file
+    // Create comprehensive fixtures
+    await this.createFixtures(testsDir, force);
+    
+    // Create enhanced global setup file
     const setupFile = path.join(testsDir, 'setup', 'global-setup.ts');
     if (!fs.existsSync(setupFile) || force) {
-      fs.writeFileSync(setupFile, this.generateSetupFile());
-      console.log('✅ Created global setup file');
+      fs.writeFileSync(setupFile, this.generateEnhancedSetupFile());
+      console.log('✅ Created enhanced global setup file');
     }
 
-    // Create sample API test
+    // Create comprehensive integration tests
     const apiTestFile = path.join(testsDir, 'integration', 'sample-api.test.ts');
     if (!fs.existsSync(apiTestFile) || force) {
       fs.writeFileSync(apiTestFile, this.generateSampleApiTest());
       console.log('✅ Created sample API test');
     }
 
-    // Create sample unit test
+    const fixturesTestFile = path.join(testsDir, 'integration', 'fixtures-example.test.ts');
+    if (!fs.existsSync(fixturesTestFile) || force) {
+      fs.writeFileSync(fixturesTestFile, this.generateFixturesExampleTest());
+      console.log('✅ Created fixtures example test');
+    }
+
+    const authTestFile = path.join(testsDir, 'integration', 'real-world-auth.test.ts');
+    if (!fs.existsSync(authTestFile) || force) {
+      fs.writeFileSync(authTestFile, this.generateRealWorldAuthTest());
+      console.log('✅ Created real-world authentication test');
+    }
+
+    // Create comprehensive unit tests
     const unitTestFile = path.join(testsDir, 'unit', 'sample-unit.test.ts');
     if (!fs.existsSync(unitTestFile) || force) {
       fs.writeFileSync(unitTestFile, this.generateSampleUnitTest());
       console.log('✅ Created sample unit test');
+    }
+
+    const fakerTestFile = path.join(testsDir, 'unit', 'faker-integration.test.ts');
+    if (!fs.existsSync(fakerTestFile) || force) {
+      fs.writeFileSync(fakerTestFile, this.generateFakerIntegrationTest());
+      console.log('✅ Created Faker.js integration test');
+    }
+
+    const schemaTestFile = path.join(testsDir, 'unit', 'schema-validation.test.ts');
+    if (!fs.existsSync(schemaTestFile) || force) {
+      fs.writeFileSync(schemaTestFile, this.generateSchemaValidationTest());
+      console.log('✅ Created schema validation test');
     }
   }
 
@@ -244,6 +272,36 @@ export class ProjectScaffolder {
       "engines": {
         "node": ">=18.0.0"
       }
+    }, null, 2);
+  }
+
+  /**
+   * Generate Mocha configuration file
+   */
+  private generateMochaConfig(): string {
+    return JSON.stringify({
+      "require": [
+        "ts-node/register",
+        "tsconfig-paths/register"
+      ],
+      "extensions": ["ts"],
+      "spec": "tests/**/*.test.ts",
+      "timeout": 30000,
+      "recursive": true,
+      "exit": true,
+      "bail": false,
+      "reporter": "spec",
+      "slow": 2000,
+      "ui": "bdd",
+      "color": true,
+      "diff": true,
+      "full-trace": true,
+      "grep": "",
+      "invert": false,
+      "check-leaks": false,
+      "globals": [
+        "restified"
+      ]
     }, null, 2);
   }
 
@@ -1044,5 +1102,730 @@ describe('Sample Unit Tests @unit', function() {
     }
 
     return generatedFiles;
+  }
+
+  /**
+   * Create comprehensive test fixtures
+   */
+  private async createFixtures(testsDir: string, force: boolean): Promise<void> {
+    const fixturesDir = path.join(testsDir, 'fixtures');
+    
+    // Create test-data.ts helper
+    const testDataFile = path.join(fixturesDir, 'test-data.ts');
+    if (!fs.existsSync(testDataFile) || force) {
+      fs.writeFileSync(testDataFile, this.generateTestDataHelper());
+      console.log('✅ Created test data helper');
+    }
+
+    // Create user-data.json
+    const userDataFile = path.join(fixturesDir, 'user-data.json');
+    if (!fs.existsSync(userDataFile) || force) {
+      fs.writeFileSync(userDataFile, this.generateUserDataFixture());
+      console.log('✅ Created user data fixture');
+    }
+
+    // Create api-responses.json
+    const apiResponsesFile = path.join(fixturesDir, 'api-responses.json');
+    if (!fs.existsSync(apiResponsesFile) || force) {
+      fs.writeFileSync(apiResponsesFile, this.generateApiResponsesFixture());
+      console.log('✅ Created API responses fixture');
+    }
+
+    // Create schemas.json
+    const schemasFile = path.join(fixturesDir, 'schemas.json');
+    if (!fs.existsSync(schemasFile) || force) {
+      fs.writeFileSync(schemasFile, this.generateSchemasFixture());
+      console.log('✅ Created schemas fixture');
+    }
+  }
+
+  /**
+   * Generate test data helper
+   */
+  private generateTestDataHelper(): string {
+    return `import * as fs from 'fs';
+import * as path from 'path';
+
+/**
+ * Test Data Loader
+ * Provides easy access to JSON fixtures and test data
+ */
+export class TestData {
+  private static cache: Map<string, any> = new Map();
+
+  /**
+   * Load JSON fixture file
+   */
+  static loadFixture(filename: string): any {
+    if (this.cache.has(filename)) {
+      return this.cache.get(filename);
+    }
+
+    const filePath = path.join(__dirname, \`\${filename}.json\`);
+    
+    if (!fs.existsSync(filePath)) {
+      throw new Error(\`Fixture file not found: \${filePath}\`);
+    }
+
+    const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    this.cache.set(filename, data);
+    return data;
+  }
+
+  /**
+   * Get user test data
+   */
+  static get users() {
+    return this.loadFixture('user-data');
+  }
+
+  /**
+   * Get API responses test data
+   */
+  static get apiResponses() {
+    return this.loadFixture('api-responses');
+  }
+
+  /**
+   * Get JSON schemas for validation
+   */
+  static get schemas() {
+    return this.loadFixture('schemas');
+  }
+
+  /**
+   * Generate random test data using Faker
+   */
+  static generateUser(faker: any) {
+    return {
+      name: faker.person.fullName(),
+      username: faker.internet.userName(),
+      email: faker.internet.email(),
+      address: {
+        street: faker.location.streetAddress(),
+        suite: faker.location.secondaryAddress(),
+        city: faker.location.city(),
+        zipcode: faker.location.zipCode(),
+        geo: {
+          lat: faker.location.latitude().toString(),
+          lng: faker.location.longitude().toString()
+        }
+      },
+      phone: faker.phone.number(),
+      website: faker.internet.domainName(),
+      company: {
+        name: faker.company.name(),
+        catchPhrase: faker.company.catchPhrase(),
+        bs: faker.company.buzzPhrase()
+      }
+    };
+  }
+
+  /**
+   * Generate random post data
+   */
+  static generatePost(faker: any, userId?: number) {
+    return {
+      title: faker.lorem.sentence(),
+      body: faker.lorem.paragraphs(2),
+      userId: userId || faker.number.int({ min: 1, max: 10 })
+    };
+  }
+
+  /**
+   * Deep clone object to avoid mutations
+   */
+  static clone<T>(obj: T): T {
+    return JSON.parse(JSON.stringify(obj));
+  }
+}
+
+// Export specific data accessors for convenience
+export const UserData = TestData.users;
+export const ApiResponses = TestData.apiResponses;
+export const Schemas = TestData.schemas;
+`;
+  }
+
+  /**
+   * Generate user data fixture
+   */
+  private generateUserDataFixture(): string {
+    return JSON.stringify({
+      "validUser": {
+        "name": "John Doe",
+        "username": "johndoe",
+        "email": "john.doe@example.com",
+        "address": {
+          "street": "123 Main St",
+          "suite": "Apt 1",
+          "city": "Anytown",
+          "zipcode": "12345-6789",
+          "geo": {
+            "lat": "-37.3159",
+            "lng": "81.1496"
+          }
+        },
+        "phone": "1-770-736-8031 x56442",
+        "website": "hildegard.org",
+        "company": {
+          "name": "Romaguera-Crona",
+          "catchPhrase": "Multi-layered client-server neural-net",
+          "bs": "harness real-time e-markets"
+        }
+      },
+      "invalidUser": {
+        "name": "",
+        "username": "a",
+        "email": "invalid-email",
+        "phone": "invalid-phone"
+      },
+      "updateUserData": {
+        "name": "Jane Smith",
+        "email": "jane.smith@example.com",
+        "phone": "1-555-123-4567"
+      },
+      "usersList": [
+        {
+          "id": 1,
+          "name": "Leanne Graham",
+          "username": "Bret",
+          "email": "Sincere@april.biz"
+        },
+        {
+          "id": 2,
+          "name": "Ervin Howell",
+          "username": "Antonette",
+          "email": "Shanna@melissa.tv"
+        }
+      ]
+    }, null, 2);
+  }
+
+  /**
+   * Generate API responses fixture
+   */
+  private generateApiResponsesFixture(): string {
+    return JSON.stringify({
+      "posts": {
+        "singlePost": {
+          "userId": 1,
+          "id": 1,
+          "title": "sunt aut facere repellat provident occaecati excepturi optio reprehenderit",
+          "body": "quia et suscipit suscipit recusandae consequuntur expedita et cum reprehenderit molestiae ut ut quas totam nostrum rerum est autem sunt rem eveniet architecto"
+        },
+        "newPost": {
+          "title": "Test Post Title",
+          "body": "This is a test post body content",
+          "userId": 1
+        }
+      },
+      "comments": {
+        "singleComment": {
+          "postId": 1,
+          "id": 1,
+          "name": "id labore ex et quam laborum",
+          "email": "Eliseo@gardner.biz",
+          "body": "laudantium enim quasi est quidem magnam voluptate ipsam eos tempora quo necessitatibus dolor quam autem quasi reiciendis et nam sapiente accusantium"
+        }
+      },
+      "errors": {
+        "notFound": {
+          "error": "Not Found",
+          "message": "The requested resource was not found",
+          "statusCode": 404
+        },
+        "validation": {
+          "error": "Validation Error",
+          "message": "Request validation failed",
+          "statusCode": 422,
+          "details": [
+            {
+              "field": "email",
+              "message": "Email is required"
+            }
+          ]
+        }
+      }
+    }, null, 2);
+  }
+
+  /**
+   * Generate schemas fixture
+   */
+  private generateSchemasFixture(): string {
+    return JSON.stringify({
+      "userSchema": {
+        "type": "object",
+        "required": ["id", "name", "username", "email"],
+        "properties": {
+          "id": { "type": "integer", "minimum": 1 },
+          "name": { "type": "string", "minLength": 1 },
+          "username": { "type": "string", "minLength": 1 },
+          "email": { "type": "string", "format": "email" },
+          "address": {
+            "type": "object",
+            "properties": {
+              "street": { "type": "string" },
+              "city": { "type": "string" },
+              "zipcode": { "type": "string" }
+            }
+          }
+        }
+      },
+      "postSchema": {
+        "type": "object",
+        "required": ["id", "title", "body", "userId"],
+        "properties": {
+          "id": { "type": "integer", "minimum": 1 },
+          "title": { "type": "string", "minLength": 1 },
+          "body": { "type": "string", "minLength": 1 },
+          "userId": { "type": "integer", "minimum": 1 }
+        }
+      },
+      "errorSchema": {
+        "type": "object",
+        "required": ["error", "message", "statusCode"],
+        "properties": {
+          "error": { "type": "string" },
+          "message": { "type": "string" },
+          "statusCode": { "type": "integer", "minimum": 400, "maximum": 599 }
+        }
+      }
+    }, null, 2);
+  }
+
+  /**
+   * Generate enhanced global setup file with real-world authentication
+   */
+  private generateEnhancedSetupFile(): string {
+    return `import { restified } from 'restifiedts';
+import * as dotenv from 'dotenv';
+
+// Load environment variables from .env file
+dotenv.config();
+
+export class TestSetup {
+  static async configure() {
+    // Configure RestifiedTS with environment variables
+    restified.configure({
+      baseURL: process.env.API_BASE_URL || 'https://jsonplaceholder.typicode.com',
+      timeout: parseInt(process.env.API_TIMEOUT || '30000'),
+      headers: {
+        'User-Agent': 'RestifiedTS-TestSuite/1.0'
+      }
+    });
+
+    // Real-world authentication: Obtain token dynamically
+    await this.authenticateAndSetTokens();
+  }
+
+  /**
+   * Real-world authentication pattern:
+   * 1. Call authentication endpoint with credentials
+   * 2. Extract token from response
+   * 3. Set as global variable for all subsequent tests
+   */
+  static async authenticateAndSetTokens() {
+    try {
+      // Option 1: Use static token from environment (for development/testing)
+      if (process.env.AUTH_TOKEN) {
+        console.log('Using static AUTH_TOKEN from environment');
+        restified.setGlobalVariable('authToken', process.env.AUTH_TOKEN);
+        return;
+      }
+
+      // Option 2: Dynamic authentication (real-world pattern)
+      if (process.env.AUTH_USERNAME && process.env.AUTH_PASSWORD) {
+        console.log('Obtaining AUTH_TOKEN dynamically via API call...');
+        
+        await restified
+          .given()
+            .baseURL(process.env.AUTH_SERVICE_URL || process.env.API_BASE_URL)
+            .contentType('application/json')
+            .jsonBody({
+              username: process.env.AUTH_USERNAME,
+              password: process.env.AUTH_PASSWORD,
+              grant_type: 'password'
+            })
+          .when()
+            .post('/auth/login')
+            .execute()
+          .then()
+            .statusCode(200)
+            .extract('$.access_token', 'authToken')
+            .extract('$.refresh_token', 'refreshToken')
+            .execute();
+
+        console.log('✅ Authentication successful - token obtained and stored');
+        return;
+      }
+
+      // Option 3: OAuth2 Client Credentials flow
+      if (process.env.OAUTH2_CLIENT_ID && process.env.OAUTH2_CLIENT_SECRET) {
+        console.log('Obtaining OAuth2 token via client credentials flow...');
+        
+        await restified
+          .given()
+            .baseURL(process.env.OAUTH2_TOKEN_URL || \`\${process.env.API_BASE_URL}/oauth\`)
+            .contentType('application/x-www-form-urlencoded')
+            .formBody({
+              grant_type: 'client_credentials',
+              client_id: process.env.OAUTH2_CLIENT_ID,
+              client_secret: process.env.OAUTH2_CLIENT_SECRET,
+              scope: process.env.OAUTH2_SCOPE || 'api:read api:write'
+            })
+          .when()
+            .post('/token')
+            .execute()
+          .then()
+            .statusCode(200)
+            .extract('$.access_token', 'authToken')
+            .execute();
+
+        console.log('✅ OAuth2 authentication successful - token obtained');
+        return;
+      }
+
+      // Option 4: API Key authentication
+      if (process.env.API_KEY) {
+        console.log('Using API_KEY authentication');
+        restified.setGlobalVariable('apiKey', process.env.API_KEY);
+        return;
+      }
+
+      console.warn('⚠️  No authentication configured - tests may fail if API requires auth');
+      
+    } catch (error) {
+      console.error('❌ Authentication failed:', error.message);
+      throw new Error(\`Authentication setup failed: \${error.message}\`);
+    }
+  }
+
+  static async cleanup() {
+    console.log('🧹 Cleaning up RestifiedTS resources...');
+    try {
+      await restified.cleanup();
+      console.log('✅ Cleanup completed successfully');
+    } catch (error) {
+      console.error('❌ Cleanup error:', error.message);
+    }
+  }
+}
+`;
+  }
+
+  /**
+   * Generate fixtures example test
+   */
+  private generateFixturesExampleTest(): string {
+    return `import { restified } from 'restifiedts';
+import { expect } from 'chai';
+import { TestSetup } from '../setup/global-setup';
+import { TestData, UserData, ApiResponses } from '../fixtures/test-data';
+
+/**
+ * Fixtures and Test Data Examples
+ * 
+ * Demonstrates how to use JSON fixtures and data-driven testing
+ */
+describe('Fixtures Examples @integration', function() {
+  before(async function() {
+    this.timeout(30000);
+    await TestSetup.configure();
+  });
+
+  after(async function() {
+    this.timeout(10000);
+    await TestSetup.cleanup();
+  });
+
+  it('should use predefined user data from fixtures', async function() {
+    const userData = TestData.clone(UserData.validUser);
+
+    const response = await restified
+      .given()
+        .baseURL('https://jsonplaceholder.typicode.com')
+        .contentType('application/json')
+        .jsonBody(userData)
+      .when()
+        .post('/users')
+        .execute();
+
+    await response
+      .statusCode(201)
+      .jsonPath('$.name', userData.name)
+      .jsonPath('$.email', userData.email)
+      .execute();
+  });
+
+  it('should test with multiple scenarios from fixtures', async function() {
+    const scenarios = [
+      { name: 'Valid User', data: UserData.validUser, shouldPass: true },
+      { name: 'Invalid User', data: UserData.invalidUser, shouldPass: false }
+    ];
+
+    for (const scenario of scenarios) {
+      console.log(\`Testing scenario: \${scenario.name}\`);
+
+      const response = await restified
+        .given()
+          .baseURL('https://jsonplaceholder.typicode.com')
+          .contentType('application/json')
+          .jsonBody(scenario.data)
+        .when()
+          .post('/users')
+          .execute();
+
+      await response
+        .statusCode(201)
+        .execute();
+    }
+  });
+});
+`;
+  }
+
+  /**
+   * Generate real-world authentication test
+   */
+  private generateRealWorldAuthTest(): string {
+    return `import { restified } from 'restifiedts';
+import { expect } from 'chai';
+import { TestSetup } from '../setup/global-setup';
+
+/**
+ * Real-world authentication patterns with RestifiedTS
+ */
+describe('Real-World Authentication @integration', function() {
+  this.timeout(30000);
+
+  before(async function() {
+    await TestSetup.configure();
+  });
+
+  after(async function() {
+    await TestSetup.cleanup();
+  });
+
+  it('should use dynamically obtained bearer token', async function() {
+    await restified
+      .given()
+        .baseURL(process.env.API_BASE_URL || 'https://jsonplaceholder.typicode.com')
+        .bearerToken('{{authToken}}')
+        .header('Content-Type', 'application/json')
+      .when()
+        .get('/posts/1')
+        .execute()
+      .then()
+        .statusCode(200)
+        .jsonPath('$.id', 1)
+        .jsonPath('$.title').exists()
+        .execute();
+  });
+
+  it('should handle protected endpoints with extracted token', async function() {
+    await restified
+      .given()
+        .baseURL(process.env.API_BASE_URL || 'https://jsonplaceholder.typicode.com')
+        .bearerToken('{{authToken}}')
+        .jsonBody({
+          title: 'Test Post',
+          body: 'This is a test post created with dynamic authentication',
+          userId: 1
+        })
+      .when()
+        .post('/posts')
+        .execute()
+      .then()
+        .statusCode(201)
+        .jsonPath('$.title', 'Test Post')
+        .execute();
+  });
+});
+`;
+  }
+
+  /**
+   * Generate Faker integration test
+   */
+  private generateFakerIntegrationTest(): string {
+    return `import { restified } from 'restifiedts';
+import { expect } from 'chai';
+import { faker } from '@faker-js/faker';
+import { TestSetup } from '../setup/global-setup';
+import { TestData } from '../fixtures/test-data';
+
+/**
+ * Faker.js Integration Tests
+ */
+describe('Faker.js Integration @unit', function() {
+  before(async function() {
+    this.timeout(30000);
+    await TestSetup.configure();
+    
+    // Set faker locale from environment or default to English
+    faker.setLocale(process.env.FAKER_LOCALE || 'en');
+    
+    // Set seed for reproducible tests if provided
+    if (process.env.MOCK_DATA_SEED) {
+      faker.seed(parseInt(process.env.MOCK_DATA_SEED));
+    }
+  });
+
+  after(async function() {
+    await TestSetup.cleanup();
+  });
+
+  it('should create user with faker-generated data', async function() {
+    const userData = TestData.generateUser(faker);
+    
+    console.log('Generated user data:', userData.name);
+
+    const response = await restified
+      .given()
+        .baseURL('https://jsonplaceholder.typicode.com')
+        .contentType('application/json')
+        .jsonBody(userData)
+      .when()
+        .post('/users')
+        .execute();
+
+    await response
+      .statusCode(201)
+      .jsonPath('$.name', userData.name)
+      .jsonPath('$.email', userData.email)
+      .execute();
+
+    expect(userData.name).to.be.a('string').and.to.have.length.greaterThan(0);
+    expect(userData.email).to.include('@');
+  });
+
+  it('should use faker data in RestifiedTS variables', async function() {
+    restified.setGlobalVariable('randomName', faker.person.fullName());
+    restified.setGlobalVariable('randomEmail', faker.internet.email());
+
+    const userData = {
+      name: '{{randomName}}',
+      email: '{{randomEmail}}'
+    };
+
+    const response = await restified
+      .given()
+        .baseURL('https://jsonplaceholder.typicode.com')
+        .contentType('application/json')
+        .jsonBody(userData)
+      .when()
+        .post('/users')
+        .execute();
+
+    await response
+      .statusCode(201)
+      .jsonPath('$.name').exists()
+      .jsonPath('$.email').exists()
+      .execute();
+  });
+});
+`;
+  }
+
+  /**
+   * Generate schema validation test
+   */
+  private generateSchemaValidationTest(): string {
+    return `import { restified } from 'restifiedts';
+import { expect } from 'chai';
+import Ajv from 'ajv';
+import addFormats from 'ajv-formats';
+import { TestSetup } from '../setup/global-setup';
+import { TestData, Schemas } from '../fixtures/test-data';
+
+/**
+ * Schema Validation Tests
+ */
+describe('Schema Validation @unit', function() {
+  let ajv: Ajv;
+
+  before(async function() {
+    this.timeout(30000);
+    await TestSetup.configure();
+    
+    ajv = new Ajv({ allErrors: true, strict: false });
+    addFormats(ajv);
+  });
+
+  after(async function() {
+    await TestSetup.cleanup();
+  });
+
+  it('should validate user response against schema', async function() {
+    const response = await restified
+      .given()
+        .baseURL('https://jsonplaceholder.typicode.com')
+      .when()
+        .get('/users/1')
+        .execute();
+
+    await response
+      .statusCode(200)
+      .jsonSchema(Schemas.userSchema)
+      .execute();
+
+    const userData = response.getData();
+    const validate = ajv.compile(Schemas.userSchema);
+    const isValid = validate(userData);
+
+    if (!isValid) {
+      console.error('Schema validation errors:', validate.errors);
+    }
+
+    expect(isValid).to.be.true;
+    expect(userData.id).to.be.a('number');
+    expect(userData.email).to.match(/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/);
+  });
+
+  it('should validate post response against schema', async function() {
+    const response = await restified
+      .given()
+        .baseURL('https://jsonplaceholder.typicode.com')
+      .when()
+        .get('/posts/1')
+        .execute();
+
+    await response
+      .statusCode(200)
+      .jsonSchema(Schemas.postSchema)
+      .execute();
+
+    const postData = response.getData();
+    expect(postData).to.have.all.keys('id', 'title', 'body', 'userId');
+    expect(postData.id).to.be.above(0);
+  });
+
+  it('should validate array responses against schema', async function() {
+    const response = await restified
+      .given()
+        .baseURL('https://jsonplaceholder.typicode.com')
+        .queryParam('_limit', 5)
+      .when()
+        .get('/posts')
+        .execute();
+
+    await response
+      .statusCode(200)
+      .jsonPath('$').isArray()
+      .jsonPath('$.length').equals(5)
+      .execute();
+
+    const posts = response.getData();
+    const validate = ajv.compile(Schemas.postSchema);
+
+    for (const post of posts) {
+      const isValid = validate(post);
+      expect(isValid).to.be.true;
+    }
+  });
+});
+`;
   }
 }

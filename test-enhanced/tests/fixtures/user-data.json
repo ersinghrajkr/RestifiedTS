@@ -1,0 +1,49 @@
+{
+  "validUser": {
+    "name": "John Doe",
+    "username": "johndoe",
+    "email": "john.doe@example.com",
+    "address": {
+      "street": "123 Main St",
+      "suite": "Apt 1",
+      "city": "Anytown",
+      "zipcode": "12345-6789",
+      "geo": {
+        "lat": "-37.3159",
+        "lng": "81.1496"
+      }
+    },
+    "phone": "1-770-736-8031 x56442",
+    "website": "hildegard.org",
+    "company": {
+      "name": "Romaguera-Crona",
+      "catchPhrase": "Multi-layered client-server neural-net",
+      "bs": "harness real-time e-markets"
+    }
+  },
+  "invalidUser": {
+    "name": "",
+    "username": "a",
+    "email": "invalid-email",
+    "phone": "invalid-phone"
+  },
+  "updateUserData": {
+    "name": "Jane Smith",
+    "email": "jane.smith@example.com",
+    "phone": "1-555-123-4567"
+  },
+  "usersList": [
+    {
+      "id": 1,
+      "name": "Leanne Graham",
+      "username": "Bret",
+      "email": "Sincere@april.biz"
+    },
+    {
+      "id": 2,
+      "name": "Ervin Howell",
+      "username": "Antonette",
+      "email": "Shanna@melissa.tv"
+    }
+  ]
+}
