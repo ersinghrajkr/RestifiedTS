@@ -1,6 +1,6 @@
 {
   "name": "restifiedts",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "RestifiedTS is a powerful, lightweight, and fully extensible API automation framework built in TypeScript, designed as a battle-ready alternative to Java's RestAssured — but with modern capabilities tailored for JavaScript/Node.js ecosystems.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
