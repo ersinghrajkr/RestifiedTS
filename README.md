@@ -6,6 +6,8 @@
 
 **RestifiedTS** is a production-grade API testing framework built in TypeScript, inspired by Java's RestAssured. Test REST APIs, GraphQL endpoints, and WebSocket connections with a fluent DSL, comprehensive features, and extensive reporting capabilities.
 
+> **🎉 NEW in v1.2.0:** Complete comprehensive features demo showcasing ALL RestifiedTS capabilities in production-ready examples!
+
 ## ✨ Key Features
 
 ✅ **Fluent DSL** - Clean `given().when().then()` syntax
@@ -124,6 +126,34 @@ describe('Your Test Suite', function() {
   });
 });
 ```
+
+## 🌟 NEW: Comprehensive Features Demo (v1.2.0)
+
+RestifiedTS v1.2.0 includes a complete comprehensive test that demonstrates **ALL** framework features in a single, production-ready example:
+
+```bash
+# Generate the comprehensive features demo
+npx restifiedts generate --type comprehensive --name my-comprehensive-demo
+
+# Or explore the built-in comprehensive test
+npm test -- --grep "comprehensive"
+```
+
+**Features Demonstrated:**
+- ✅ **Configuration Management** - JSON, .env, and runtime configuration
+- ✅ **Authentication Flow** - Complete login → token → refresh workflow  
+- ✅ **Variable Templating** - All built-in functions ($faker, $date, $math, $string, $random, $env)
+- ✅ **Multiple Client Management** - mainAPI, authService, paymentGateway, externalAPI
+- ✅ **Performance Testing** - 10 concurrent requests with metrics
+- ✅ **Security Testing** - Authentication validation and input sanitization
+- ✅ **Database Integration** - Setup/teardown/validation patterns
+- ✅ **GraphQL & WebSocket** - Complete testing workflows
+- ✅ **Snapshot Testing** - Response comparison and validation
+- ✅ **Report Generation** - HTML/JSON reports with metadata
+- ✅ **Error Handling** - Retries, fallbacks, and recovery patterns
+- ✅ **Logging & Audit** - Complete request/response/error logging
+
+This comprehensive demo serves as both a **complete feature showcase** and a **learning resource** for production implementation patterns.
 
 ## 📚 Complete Examples
 

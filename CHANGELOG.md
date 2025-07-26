@@ -5,6 +5,144 @@ All notable changes to RestifiedTS will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2025-07-26
+
+### 🔧 Bug Fixes
+
+#### **Double Execute Pattern Corrections**
+- **Fixed**: Comprehensive features test now uses proper double execute pattern
+- **Fixed**: All DSL chains properly separated between request execution and assertion execution
+- **Improved**: Consistent API usage patterns across all generated tests and examples
+
+#### **API Testing Reliability**
+- **Enhanced**: Authentication flow in comprehensive test with proper request/assertion separation
+- **Enhanced**: Performance testing with correct async execution patterns
+- **Enhanced**: Security testing with proper error handling patterns
+
+### 📋 Technical Details
+
+The comprehensive features demo and all CLI-generated tests now consistently follow RestifiedTS's double execute pattern:
+
+```typescript
+// ✅ Correct Pattern (v1.2.1)
+const response = await restified
+  .given().baseURL('https://api.example.com')
+  .when().get('/posts/1')
+  .execute(); // First execute() - sends the request
+
+await response
+  .statusCode(200)
+  .jsonPath('$.title').isString()
+  .execute(); // Second execute() - runs assertions
+```
+
+This ensures reliable request execution and proper assertion handling across all framework features.
+
+**Migration**: No breaking changes - existing code continues to work unchanged.
+
+---
+
+## [1.2.0] - 2025-07-26
+
+### 🌟 Major Features Added
+
+#### **Comprehensive Features Demo**
+- **NEW**: Complete comprehensive test showcasing ALL RestifiedTS features in a single production-ready example
+- **Features Demonstrated**: Configuration management, authentication flows, variable templating, multi-client management, performance testing, security testing, database integration, GraphQL/WebSocket testing, snapshot testing, report generation, error handling, and logging
+- **Production Patterns**: Realistic authentication workflows with token management, concurrent API testing, and complete setup/teardown patterns
+
+#### **Enhanced CLI Capabilities**
+- **NEW**: `--type comprehensive` option for generating complete feature demonstrations
+- **Improved**: CLI templates now use proper RestifiedTS API methods (`setGlobalVariable`, `getGlobalVariable`, etc.)
+- **Enhanced**: All CLI-generated tests follow production-ready patterns and conventions
+
+#### **Advanced Configuration Management**
+- **NEW**: JSON file configuration loading support
+- **NEW**: Environment variable configuration patterns
+- **NEW**: Runtime configuration updates and merging
+- **Improved**: Configuration validation and error handling
+
+#### **Database Integration Enhancements**
+- **Enhanced**: Mock database implementation with advanced SQL operation support
+- **NEW**: Transaction rollback with proper deep copying
+- **NEW**: SQL IN clause support for array parameters
+- **NEW**: Mathematical SQL operations support
+- **Improved**: Database connection lifecycle management
+
+#### **Variable Resolution System Improvements**
+- **Enhanced**: Template variable processing with built-in function support
+- **NEW**: `$date.iso`, `$math.pi`, `$string.*` functions
+- **NEW**: Nested object and array access in templates
+- **Improved**: Cycle detection and error handling in template resolution
+
+#### **Authentication & Security**
+- **NEW**: Complete authentication flow examples (login → token → refresh)
+- **NEW**: Security testing patterns with input validation
+- **NEW**: Authentication token management and refresh workflows
+- **Enhanced**: Bearer token authentication with global variable integration
+
+#### **Performance & Load Testing**
+- **NEW**: Concurrent request testing with performance metrics
+- **NEW**: Load testing patterns with 10+ simultaneous requests
+- **NEW**: Performance validation and timeout testing
+- **Enhanced**: Response time measurement and reporting
+
+#### **Testing Framework Enhancements**
+- **NEW**: GraphQL testing patterns and endpoint configuration
+- **NEW**: WebSocket testing with connection management and messaging
+- **NEW**: Snapshot testing with response comparison
+- **NEW**: Complete error handling and recovery patterns
+- **Enhanced**: Logging and audit trail capabilities
+
+### 🔧 Technical Improvements
+
+#### **API Consistency**
+- **Fixed**: All internal tests now use proper RestifiedTS API methods instead of internal methods
+- **Standardized**: Consistent usage of `setGlobalVariable`/`getGlobalVariable` throughout
+- **Improved**: Type safety and IntelliSense support for all public APIs
+
+#### **Build & Development**
+- **Enhanced**: TypeScript compilation with proper path resolution
+- **Improved**: CLI binary configuration and distribution
+- **Fixed**: Module resolution issues in test environments
+
+#### **Documentation & Examples**
+- **NEW**: Comprehensive documentation updates reflecting v1.2.0 features
+- **Enhanced**: README with detailed comprehensive features demo section
+- **Improved**: Code examples using latest API patterns
+
+### 📦 Package Improvements
+
+#### **Distribution**
+- **Enhanced**: Package metadata with comprehensive keyword coverage
+- **Improved**: CLI tooling distribution and installation
+- **Optimized**: Build output size and structure
+
+#### **Dependencies**
+- **Updated**: Development tooling and testing dependencies
+- **Maintained**: Zero breaking changes to existing APIs
+- **Enhanced**: TypeScript support and type definitions
+
+### 🚀 Migration Guide
+
+This release is **fully backward compatible**. No breaking changes were introduced.
+
+**New Features to Explore:**
+```bash
+# Generate comprehensive features demo
+npx restifiedts generate --type comprehensive --name my-demo
+
+# Run existing comprehensive test
+npm test -- --grep "comprehensive"
+```
+
+**Recommended Updates:**
+- Update any direct usage of internal methods to public APIs
+- Explore new comprehensive test patterns for learning best practices
+- Consider adopting new configuration management patterns
+
+---
+
 ## [1.0.0] - 2025-07-24
 
 ### Added

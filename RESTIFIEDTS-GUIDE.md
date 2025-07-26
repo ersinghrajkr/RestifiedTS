@@ -2,18 +2,70 @@
 
 A comprehensive guide to master RestifiedTS for REST API automation testing with TypeScript.
 
+> **🎉 NEW in v1.2.0:** Complete comprehensive features demo showcasing ALL RestifiedTS capabilities!
+
 ---
 
 ## 📋 Table of Contents
 
-1. [🎯 Quick Start](#-quick-start)
-2. [⚙️ Configuration Guide](#️-configuration-guide)
-3. [🔐 Authentication &amp; Token Management](#-authentication--token-management)
-4. [🏗️ Multi-Instance Architecture](#️-multi-instance-architecture)
-5. [📚 Complete Examples](#-complete-examples)
-6. [🔧 Advanced Features](#-advanced-features)
-7. [📦 Publishing to NPM](#-publishing-to-npm)
-8. [🐛 Troubleshooting](#-troubleshooting)
+1. [🌟 NEW: Comprehensive Features Demo (v1.2.0)](#-new-comprehensive-features-demo-v120)
+2. [🎯 Quick Start](#-quick-start)
+3. [⚙️ Configuration Guide](#️-configuration-guide)
+4. [🔐 Authentication &amp; Token Management](#-authentication--token-management)
+5. [🏗️ Multi-Instance Architecture](#️-multi-instance-architecture)
+6. [📚 Complete Examples](#-complete-examples)
+7. [🔧 Advanced Features](#-advanced-features)
+8. [📦 Publishing to NPM](#-publishing-to-npm)
+9. [🐛 Troubleshooting](#-troubleshooting)
+
+---
+
+## 🌟 NEW: Comprehensive Features Demo (v1.2.0)
+
+RestifiedTS v1.2.0 includes a complete comprehensive test that showcases **ALL** framework capabilities in a single, production-ready example. This is the perfect starting point for learning RestifiedTS!
+
+### Generate Your Own Comprehensive Demo
+
+```bash
+# Generate a comprehensive features demo
+npx restifiedts generate --type comprehensive --name my-comprehensive-demo
+
+# This creates a complete test file demonstrating:
+# ✅ Configuration management (JSON, .env, runtime)
+# ✅ Authentication flow (login → token → refresh)
+# ✅ Variable templating with all built-in functions
+# ✅ Multiple client management
+# ✅ Performance testing (10 concurrent requests)
+# ✅ Security testing patterns
+# ✅ Database integration workflows
+# ✅ GraphQL and WebSocket testing
+# ✅ Snapshot testing and report generation
+# ✅ Complete error handling and logging
+```
+
+### Explore the Built-in Demo
+
+```bash
+# Run the comprehensive features test
+npm test -- --grep "comprehensive"
+
+# View the source for learning
+cat tests/integration/comprehensive-features.test.ts
+```
+
+### What You'll Learn
+
+The comprehensive demo demonstrates **production-ready patterns** including:
+
+- **Real Authentication Flows**: Login → extract tokens → use in subsequent requests
+- **Multi-Service Testing**: Different clients for auth, main API, payments, external services
+- **Performance Validation**: Concurrent request testing with metrics
+- **Database Integration**: Setup/teardown patterns with state validation
+- **Security Patterns**: Input validation and authentication testing
+- **Error Recovery**: Retry logic, fallbacks, and graceful degradation
+- **Complete Configuration**: JSON files, environment variables, runtime updates
+
+This comprehensive demo serves as both a **feature showcase** and a **learning resource** for implementing RestifiedTS in production environments.
 
 ---
 
