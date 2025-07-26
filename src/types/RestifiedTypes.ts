@@ -558,6 +558,7 @@ export interface GraphQLConfig {
   headers?: Record<string, string>;
   introspection?: boolean;
   defaultVariables?: Record<string, any>;
+  httpClient?: any; // HttpClient type - avoid circular dependency
 }
 
 // ==========================================
@@ -859,6 +860,21 @@ export interface TrendData {
 }
 
 export type TrendDirection = 'increasing' | 'decreasing' | 'stable';
+
+// ==========================================
+// CLIENT MANAGEMENT TYPES
+// ==========================================
+
+export type ClientType = 'http' | 'graphql' | 'websocket';
+
+export interface ClientInfo {
+  name: string;
+  type: ClientType;
+  active: boolean;
+  createdAt: Date;
+  lastUsed?: Date;
+  requestCount: number;
+}
 
 // ==========================================
 // EXPORT TYPES

@@ -27,7 +27,8 @@ export {
   GraphQLManager, 
   GraphQLQueryBuilder,
   WebSocketClient,
-  WebSocketManager
+  WebSocketManager,
+  ClientManager
 } from './core/clients';
 
 // Configuration exports
@@ -79,7 +80,13 @@ export {
 // Logging and Reporting exports
 export { 
   RestifiedLogger,
-  TransportFactory
+  TransportFactory,
+  ConsoleTransport,
+  FileTransport,
+  JsonFileTransport,
+  HttpTransport,
+  MemoryTransport,
+  SyslogTransport
 } from './logging';
 
 // Reporting exports

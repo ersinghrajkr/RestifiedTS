@@ -49,7 +49,7 @@ program
   .command('generate')
   .alias('gen')
   .description('Generate test files')
-  .requiredOption('-t, --type <type>', 'Test type (api, auth, multi-client, performance, graphql, websocket, database, security, unified, validation)')
+  .requiredOption('-t, --type <type>', 'Test type (api, auth, multi-client, performance, graphql, websocket, database, security, unified, validation, comprehensive)')
   .requiredOption('-n, --name <name>', 'Test name')
   .option('-o, --output <path>', 'Output directory', 'tests')
   .option('-b, --baseURL <url>', 'Base URL for API tests')

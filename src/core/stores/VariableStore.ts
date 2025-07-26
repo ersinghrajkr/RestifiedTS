@@ -100,9 +100,59 @@ export class VariableStore {
 
   /**
    * Get variable with scope resolution (local first, then global)
+   * Supports dot notation for nested object access (e.g., 'user.profile.name')
    */
   get(key: string): any {
-    return this.localVariables.get(key) ?? this.globalVariables.get(key);
+    // Handle simple key first - check existence to distinguish null from undefined
+    if (this.localVariables.has(key)) {
+      return this.localVariables.get(key);
+    }
+    if (this.globalVariables.has(key)) {
+      return this.globalVariables.get(key);
+    }
+    
+    if (!key.includes('.')) {
+      return undefined;
+    }
+
+    // Handle dot notation for nested access
+    const parts = key.split('.');
+    const rootKey = parts[0];
+    let rootValue: any;
+    
+    if (this.localVariables.has(rootKey)) {
+      rootValue = this.localVariables.get(rootKey);
+    } else if (this.globalVariables.has(rootKey)) {
+      rootValue = this.globalVariables.get(rootKey);
+    } else {
+      return undefined;
+    }
+    
+    if (rootValue === undefined || rootValue === null) {
+      return undefined;
+    }
+
+    // Navigate through the nested properties
+    let current = rootValue;
+    for (let i = 1; i < parts.length; i++) {
+      const part = parts[i];
+      
+      if (current === null || current === undefined) {
+        return undefined;
+      }
+      
+      // Handle array access (e.g., colors.0)
+      if (Array.isArray(current) && /^\d+$/.test(part)) {
+        const index = parseInt(part, 10);
+        current = current[index];
+      } else if (typeof current === 'object' && current.hasOwnProperty(part)) {
+        current = current[part];
+      } else {
+        return undefined;
+      }
+    }
+    
+    return current;
   }
 
   /**
@@ -160,8 +210,8 @@ export class VariableStore {
   /**
    * Resolve template string with variables
    */
-  resolve(template: string): string {
-    if (typeof template !== 'string') {
+  resolve(template: string, resolvedKeys: Set<string> = new Set()): string {
+    if (typeof template !== 'string' || template === null || template === undefined) {
       return template;
     }
 
@@ -190,9 +240,29 @@ export class VariableStore {
           return this.resolveMath(trimmed);
         }
         
+        if (trimmed.startsWith('$string.')) {
+          return this.resolveString(trimmed);
+        }
+        
         // Handle regular variables
+        if (resolvedKeys.has(trimmed)) {
+          // Prevent infinite recursion
+          return match;
+        }
+        
         const value = this.get(trimmed);
-        return value !== undefined ? String(value) : match;
+        if (value !== undefined) {
+          const stringValue = String(value);
+          // Check if the resolved value itself contains templates and resolve recursively
+          if (stringValue.includes('{{') && stringValue.includes('}}')) {
+            resolvedKeys.add(trimmed);
+            const resolved = this.resolve(stringValue, resolvedKeys);
+            resolvedKeys.delete(trimmed);
+            return resolved;
+          }
+          return stringValue;
+        }
+        return match;
         
       } catch (error) {
         console.warn(`[VariableStore] Failed to resolve template: ${trimmed}`, error);
@@ -301,6 +371,8 @@ export class VariableStore {
     switch (path) {
       case 'now':
         return new Date().toISOString();
+      case 'iso':
+        return new Date().toISOString();
       case 'today':
         return moment().format('YYYY-MM-DD');
       case 'yesterday':
@@ -346,6 +418,14 @@ export class VariableStore {
   private resolveMath(expression: string): string {
     const path = expression.substring(6); // Remove '$math.'
     
+    // Handle math constants
+    switch (path) {
+      case 'pi':
+        return Math.PI.toString();
+      case 'e':
+        return Math.E.toString();
+    }
+    
     const match = path.match(/^(\w+)\(([^)]+)\)$/);
     if (match) {
       const [, func, params] = match;
@@ -373,6 +453,54 @@ export class VariableStore {
     }
     
     throw new Error(`Invalid math expression: ${path}`);
+  }
+
+  /**
+   * Resolve string expressions
+   */
+  private resolveString(expression: string): string {
+    const path = expression.substring(8); // Remove '$string.'
+    
+    const match = path.match(/^(\w+)\(([^)]+)\)$/);
+    if (match) {
+      const [, func, params] = match;
+      // Parse parameters, handling both quoted strings and variable references
+      const args = params.split(',').map(p => {
+        const trimmed = p.trim();
+        if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
+          return trimmed.slice(1, -1); // Remove quotes
+        } else if (trimmed.startsWith("'") && trimmed.endsWith("'")) {
+          return trimmed.slice(1, -1); // Remove quotes
+        } else {
+          // Assume it's a variable reference
+          const varValue = this.get(trimmed);
+          return varValue !== undefined ? String(varValue) : trimmed;
+        }
+      });
+      
+      switch (func) {
+        case 'upper':
+          return args[0].toUpperCase();
+        case 'lower':
+          return args[0].toLowerCase();
+        case 'capitalize':
+          return args[0].charAt(0).toUpperCase() + args[0].slice(1).toLowerCase();
+        case 'trim':
+          return args[0].trim();
+        case 'length':
+          return args[0].length.toString();
+        case 'substring':
+          const start = parseInt(args[1], 10) || 0;
+          const end = args[2] ? parseInt(args[2], 10) : undefined;
+          return args[0].substring(start, end);
+        case 'replace':
+          return args[0].replace(args[1], args[2] || '');
+        default:
+          throw new Error(`Unknown string function: ${func}`);
+      }
+    }
+    
+    throw new Error(`Invalid string expression: ${path}`);
   }
 
   /**

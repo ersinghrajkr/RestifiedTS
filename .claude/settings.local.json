@@ -24,7 +24,13 @@
       "Bash(dir:*)",
       "Bash(timeout 30s npx mocha --project tsconfig.test.json -r ts-node/register -r tsconfig-paths/register -r tests/helpers/cleanup-helper.ts \"tests/unit/logging/RestifiedLogger.test.ts\" --reporter spec)",
       "Bash(timeout 300s npm test)",
-      "Bash(npm run cli:*)"
+      "Bash(npm run cli:*)",
+      "Bash(npm install:*)",
+      "Bash(node:*)",
+      "Bash(grep:*)",
+      "Bash(npx restifiedts init:*)",
+      "Bash(npm run lint)",
+      "mcp__ide__getDiagnostics"
     ],
     "deny": []
   }

@@ -124,18 +124,30 @@ export class ProjectScaffolder {
     // Create comprehensive fixtures
     await this.createFixtures(testsDir, force);
     
-    // Create enhanced global setup file
-    const setupFile = path.join(testsDir, 'setup', 'global-setup.ts');
-    if (!fs.existsSync(setupFile) || force) {
-      fs.writeFileSync(setupFile, this.generateEnhancedSetupFile());
-      console.log('✅ Created enhanced global setup file');
+    // Create both setup examples
+    const manualSetupFile = path.join(testsDir, 'setup', 'manual-setup.ts');
+    if (!fs.existsSync(manualSetupFile) || force) {
+      fs.writeFileSync(manualSetupFile, this.generateManualSetupFile());
+      console.log('✅ Created manual setup example (class methods)');
+    }
+
+    const globalSetupFile = path.join(testsDir, 'setup', 'global-setup.ts');
+    if (!fs.existsSync(globalSetupFile) || force) {
+      fs.writeFileSync(globalSetupFile, this.generateGlobalSetupFile());
+      console.log('✅ Created global setup example (automatic hooks)');
     }
 
     // Create comprehensive integration tests
     const apiTestFile = path.join(testsDir, 'integration', 'sample-api.test.ts');
     if (!fs.existsSync(apiTestFile) || force) {
       fs.writeFileSync(apiTestFile, this.generateSampleApiTest());
-      console.log('✅ Created sample API test');
+      console.log('✅ Created sample API test (manual setup)');
+    }
+
+    const globalApiTestFile = path.join(testsDir, 'integration', 'sample-api-global.test.ts');
+    if (!fs.existsSync(globalApiTestFile) || force) {
+      fs.writeFileSync(globalApiTestFile, this.generateGlobalApiTest());
+      console.log('✅ Created sample API test (global setup)');
     }
 
     const fixturesTestFile = path.join(testsDir, 'integration', 'fixtures-example.test.ts');
@@ -216,27 +228,12 @@ export class ProjectScaffolder {
       "description": `API testing project using RestifiedTS`,
       "main": "index.js",
       "scripts": {
-        "test": "npm run test:clean && npm run test:run",
-        "test:run": "mocha --require ts-node/register --require tsconfig-paths/register 'tests/**/*.test.ts' --reporter mochawesome --reporter-options reportDir=reports,reportFilename=test-report,json=true,html=true,inline=true,charts=true,code=true",
-        "test:unit": "mocha --require ts-node/register --require tsconfig-paths/register 'tests/unit/**/*.test.ts' --reporter mochawesome --reporter-options reportDir=reports,reportFilename=unit-report,json=true,html=true",
-        "test:integration": "mocha --require ts-node/register --require tsconfig-paths/register 'tests/integration/**/*.test.ts' --reporter mochawesome --reporter-options reportDir=reports,reportFilename=integration-report,json=true,html=true",
-        "test:smoke": "mocha --require ts-node/register --require tsconfig-paths/register --grep '@smoke' 'tests/**/*.test.ts' --reporter mochawesome --reporter-options reportDir=reports,reportFilename=smoke-report,json=true,html=true",
-        "test:fixtures": "mocha --require ts-node/register --require tsconfig-paths/register 'tests/**/fixtures-example.test.ts' --reporter spec",
-        "test:faker": "mocha --require ts-node/register --require tsconfig-paths/register 'tests/**/faker-integration.test.ts' --reporter spec",
-        "test:schema": "mocha --require ts-node/register --require tsconfig-paths/register 'tests/**/schema-validation.test.ts' --reporter spec",
-        "test:auth": "mocha --require ts-node/register --require tsconfig-paths/register 'tests/**/real-world-auth.test.ts' --reporter spec",
-        "test:comprehensive": "npm run test:unit && npm run test:integration && npm run test:smoke && npm run test:merge && npm run test:report:comprehensive",
-        "test:merge": "mochawesome-merge 'reports/*.json' -o reports/merged-report.json",
-        "test:report": "marge reports/test-report.json --reportDir reports --reportFilename test-report --inline --charts --code --timestamp",
-        "test:report:comprehensive": "marge reports/merged-report.json --reportDir reports --reportFilename comprehensive-report --inline --charts --code --timestamp",
+        "test": "npm run test:clean && npx mocha --require ts-node/register --require tsconfig-paths/register 'tests/**/*.test.ts' --reporter mochawesome --reporter-options reportDir=reports,reportFilename=test-report,json=true,html=true,inline=true,charts=true,code=true",
+        "test:unit": "npm run test:clean && npx mocha --require ts-node/register --require tsconfig-paths/register 'tests/unit/**/*.test.ts' --reporter mochawesome --reporter-options reportDir=reports,reportFilename=unit-report,json=true,html=true",
+        "test:integration": "npm run test:clean && npx mocha --require ts-node/register --require tsconfig-paths/register 'tests/integration/**/*.test.ts' --reporter mochawesome --reporter-options reportDir=reports,reportFilename=integration-report,json=true,html=true",
+        "test:smoke": "npm run test:clean && npx mocha --require ts-node/register --require tsconfig-paths/register --grep '@smoke' 'tests/**/*.test.ts' --reporter mochawesome --reporter-options reportDir=reports,reportFilename=smoke-report,json=true,html=true",
         "test:clean": "rimraf reports && mkdirp reports",
-        "test:watch": "nodemon --ext ts --watch tests --exec 'npm run test:run'",
-        "test:debug": "mocha --require ts-node/register --require tsconfig-paths/register --inspect-brk --reporter spec",
-        "report": "restifiedts report --comprehensive --open",
-        "lint": "eslint tests/**/*.ts --fix",
-        "format": "prettier --write 'tests/**/*.ts'",
         "build": "tsc --noEmit",
-        "dev": "npm run test:watch",
         "setup": "npm install && npm run test:clean"
       },
       "keywords": ["api", "testing", "restifiedts", "automation"],
@@ -244,30 +241,13 @@ export class ProjectScaffolder {
       "license": "MIT",
       "dependencies": {
         "restifiedts": "^1.1.0",
-        "dotenv": "^16.3.1",
-        "@faker-js/faker": "^8.3.1",
-        "chai": "^4.3.10",
-        "mocha": "^10.2.0",
-        "ajv": "^8.12.0",
-        "ajv-formats": "^2.1.1"
+        "dotenv": "^16.3.1"
       },
       "devDependencies": {
-        "@types/chai": "^4.3.11",
-        "@types/mocha": "^10.0.6",
         "@types/node": "^20.10.5",
-        "@typescript-eslint/eslint-plugin": "^6.17.0",
-        "@typescript-eslint/parser": "^6.17.0",
-        "eslint": "^8.56.0",
-        "mochawesome": "^7.1.3",
-        "mochawesome-merge": "^4.3.0",
-        "marge": "^1.0.1",
-        "nodemon": "^3.0.2",
-        "prettier": "^3.1.1",
+        "typescript": "^5.3.3",
         "rimraf": "^5.0.5",
-        "mkdirp": "^3.0.1",
-        "ts-node": "^10.9.2",
-        "tsconfig-paths": "^4.2.0",
-        "typescript": "^5.3.3"
+        "mkdirp": "^3.0.1"
       },
       "engines": {
         "node": ">=18.0.0"
@@ -283,6 +263,8 @@ export class ProjectScaffolder {
       "require": [
         "ts-node/register",
         "tsconfig-paths/register"
+        // Uncomment next line to use global setup (no manual setup/cleanup needed in tests):
+        // "tests/setup/global-setup.ts"
       ],
       "extensions": ["ts"],
       "spec": "tests/**/*.test.ts",
@@ -559,8 +541,8 @@ GRAPHQL_PLAYGROUND=false
 # ===========================================
 # HTTP/HTTPS proxy settings (optional)
 
-HTTP_PROXY=http://proxy.company.com:8080
-HTTPS_PROXY=https://proxy.company.com:8080
+HTTP_PROXY=http://proxy.example.com:8080
+HTTPS_PROXY=https://proxy.example.com:8080
 NO_PROXY=localhost,127.0.0.1,*.local
 
 # ===========================================
@@ -774,24 +756,33 @@ cp .env.example .env
 
 ## 🧪 Writing Tests
 
-### Basic API Test
+RestifiedTS provides two setup approaches for your tests:
+
+### Option 1: Manual Setup (Explicit Control)
+
+Use this approach when you want explicit control over setup/cleanup in each test file:
 
 \`\`\`typescript
 import { restified } from 'restifiedts';
 import { expect } from 'chai';
+import { TestSetup } from './setup/manual-setup';
 
 describe('API Tests', function() {
-  afterAll(async function() {
-    await restified.cleanup();
+  before(async function() {
+    await TestSetup.configure();
+  });
+
+  after(async function() {
+    await TestSetup.cleanup();
   });
 
   it('should test API endpoint', async function() {
     const response = await restified
       .given()
-        .baseURL(process.env.API_BASE_URL)
-        .bearerToken(process.env.AUTH_TOKEN)
+        .baseURL('https://jsonplaceholder.typicode.com')
+        .bearerToken('{{authToken}}') // Uses globally configured token
       .when()
-        .get('/users')
+        .get('/posts')
         .execute();
 
     await response
@@ -801,6 +792,57 @@ describe('API Tests', function() {
   });
 });
 \`\`\`
+
+### Option 2: Global Setup (Automatic)
+
+Use this approach for cleaner test files without repetitive setup/cleanup:
+
+1. **Enable Global Setup**: Uncomment the global setup in \`.mocharc.json\`:
+   \`\`\`json
+   {
+     "require": [
+       "ts-node/register",
+       "tsconfig-paths/register",
+       "tests/setup/global-setup.ts"
+     ]
+   }
+   \`\`\`
+
+2. **Write Clean Tests**:
+   \`\`\`typescript
+   import { restified } from 'restifiedts';
+   import { expect } from 'chai';
+   import { getBaseURL, getAuthToken } from './setup/global-setup';
+
+   describe('API Tests', function() {
+     // No manual setup/cleanup needed!
+
+     it('should test API endpoint', async function() {
+       const response = await restified
+         .given()
+           .baseURL(getBaseURL()) // Uses global configuration
+           .bearerToken(getAuthToken()) // Uses global auth
+         .when()
+           .get('/posts')
+           .execute();
+
+       await response
+         .statusCode(200)
+         .jsonPath('$[0].id').isNumber()
+         .execute();
+     });
+   });
+   \`\`\`
+
+### Comparison
+
+| Feature | Manual Setup | Global Setup |
+|---------|-------------|--------------|
+| Setup Control | Explicit per test file | Automatic across all tests |
+| Code Repetition | More repetitive | Less repetitive |
+| Test File Size | Larger | Smaller |
+| Configuration | Per-test flexibility | Centralized configuration |
+| Best For | Complex setup variations | Standard setup patterns |
 
 ### Generate New Tests
 
@@ -919,8 +961,17 @@ export class TestSetup {
   private generateSampleApiTest(): string {
     return `import { restified } from 'restifiedts';
 import { expect } from 'chai';
-import { TestSetup } from '../setup/global-setup';
+import { TestSetup } from '../setup/manual-setup';
 
+/**
+ * Sample API Tests - Manual Setup Approach
+ * 
+ * This example demonstrates the manual setup approach where you explicitly
+ * call TestSetup.configure() and TestSetup.cleanup() in each test file.
+ * 
+ * Alternative: Use '../setup/global-setup' for automatic setup without 
+ * manual before/after hooks in each test file.
+ */
 describe('Sample API Tests @smoke', function() {
   before(async function() {
     await TestSetup.configure();
@@ -943,12 +994,12 @@ describe('Sample API Tests @smoke', function() {
 
     await response
       .statusCode(200)
-      .jsonPath('$[0].id')
-      .jsonPath('$[0].title')
+      .jsonPathExists('$[0].id')
+      .jsonPathExists('$[0].title')
       .execute();
 
-    expect(response.data).to.be.an('array');
-    expect(response.data.length).to.be.greaterThan(0);
+    expect(response.getData()).to.be.an('array');
+    expect(response.getData().length).to.be.greaterThan(0);
   });
 
   it('should get a specific post', async function() {
@@ -965,11 +1016,11 @@ describe('Sample API Tests @smoke', function() {
     await response
       .statusCode(200)
       .jsonPath('$.id', 1)
-      .jsonPath('$.title')
-      .jsonPath('$.body')
+      .jsonPathExists('$.title')
+      .jsonPathExists('$.body')
       .execute();
 
-    expect(response.data.id).to.equal(1);
+    expect(response.getData().id).to.equal(1);
   });
 
   it('should create a new post', async function() {
@@ -997,7 +1048,121 @@ describe('Sample API Tests @smoke', function() {
       .jsonPath('$.userId', newPost.userId)
       .execute();
 
-    expect(response.data.id).to.be.a('number');
+    expect(response.getData().id).to.be.a('number');
+  });
+});
+`;
+  }
+
+  /**
+   * Generate sample API test using global setup approach
+   */
+  private generateGlobalApiTest(): string {
+    return `import { restified } from 'restifiedts';
+import { expect } from 'chai';
+import { getBaseURL, getAuthToken, isAuthConfigured } from '../setup/global-setup';
+
+/**
+ * Sample API Tests - Global Setup Approach
+ * 
+ * This example demonstrates the global setup approach where setup/cleanup
+ * happens automatically without manual before/after hooks in each test file.
+ * 
+ * Requirements:
+ * 1. Include global-setup.ts in your Mocha configuration:
+ *    - Add to .mocharc.json: "require": ["tests/setup/global-setup.ts"]
+ *    - Or use --require flag: mocha --require tests/setup/global-setup.ts
+ * 
+ * Benefits:
+ * - No repetitive setup/cleanup code in test files
+ * - Cleaner test code focused on test logic
+ * - Centralized configuration management
+ * - Automatic authentication and resource cleanup
+ */
+describe('Sample API Tests - Global Setup @smoke', function() {
+  // No manual before/after hooks needed!
+  // Global setup handles everything automatically
+
+  it('should get all posts using global configuration', async function() {
+    this.timeout(10000);
+
+    const response = await restified
+      .given()
+        .baseURL(getBaseURL()) // Uses globally configured URL
+        .header('Content-Type', 'application/json')
+        // Auth token is already configured globally if available
+      .when()
+        .get('/posts')
+        .execute();
+
+    await response
+      .statusCode(200)
+      .jsonPathExists('$[0].id')
+      .jsonPathExists('$[0].title')
+      .execute();
+
+    expect(response.getData()).to.be.an('array');
+    expect(response.getData().length).to.be.greaterThan(0);
+  });
+
+  it('should get a specific post with automatic auth', async function() {
+    this.timeout(10000);
+    
+    // Skip this test if no auth is configured
+    if (!isAuthConfigured()) {
+      this.skip();
+      return;
+    }
+
+    const response = await restified
+      .given()
+        .baseURL(getBaseURL())
+        .header('Content-Type', 'application/json')
+        .bearerToken(getAuthToken()) // Uses globally configured token
+      .when()
+        .get('/posts/1')
+        .execute();
+
+    await response
+      .statusCode(200)
+      .jsonPath('$.id', 1)
+      .jsonPathExists('$.title')
+      .jsonPathExists('$.body')
+      .execute();
+
+    expect(response.getData().id).to.equal(1);
+  });
+
+  it('should create a new post with global settings', async function() {
+    this.timeout(10000);
+
+    const newPost = {
+      title: 'Test Post - Global Setup',
+      body: 'This post was created using global setup configuration',
+      userId: 1
+    };
+
+    const response = await restified
+      .given()
+        .baseURL(getBaseURL()) // Automatically uses configured base URL
+        .header('Content-Type', 'application/json')
+        .body(newPost)
+      .when()
+        .post('/posts')
+        .execute();
+
+    await response
+      .statusCode(201)
+      .jsonPath('$.title', newPost.title)
+      .jsonPath('$.body', newPost.body)
+      .jsonPath('$.userId', newPost.userId)
+      .execute();
+
+    expect(response.getData().id).to.be.a('number');
+    
+    // Log success with configuration info
+    console.log(\`✅ Created post using base URL: \${getBaseURL()}\`);
+    console.log(\`🔐 Authentication configured: \${isAuthConfigured() ? 'Yes' : 'No'}\`);
   });
 });
 `;
@@ -1396,9 +1561,9 @@ export const Schemas = TestData.schemas;
   }
 
   /**
-   * Generate enhanced global setup file with real-world authentication
+   * Generate manual setup file with class methods (requires manual calls in tests)
    */
-  private generateEnhancedSetupFile(): string {
+  private generateManualSetupFile(): string {
     return `import { restified } from 'restifiedts';
 import * as dotenv from 'dotenv';
 
@@ -1452,11 +1617,13 @@ export class TestSetup {
             })
           .when()
             .post('/auth/login')
-            .execute()
-          .then()
-            .statusCode(200)
-            .extract('$.access_token', 'authToken')
-            .extract('$.refresh_token', 'refreshToken');
+            .execute();
+
+        await response
+          .statusCode(200)
+          .extract('$.access_token', 'authToken')
+          .extract('$.refresh_token', 'refreshToken')
+          .execute();
 
         console.log('✅ Authentication successful - token obtained and stored');
         return;
@@ -1468,7 +1635,7 @@ export class TestSetup {
         
         const oauthURL = process.env.OAUTH2_TOKEN_URL || \`\${process.env.API_BASE_URL || 'https://jsonplaceholder.typicode.com'}/oauth\`;
         
-        await restified
+        const oauthResponse = await restified
           .given()
             .baseURL(oauthURL)
             .contentType('application/x-www-form-urlencoded')
@@ -1480,10 +1647,12 @@ export class TestSetup {
             })
           .when()
             .post('/token')
-            .execute()
-          .then()
-            .statusCode(200)
-            .extract('$.access_token', 'authToken');
+            .execute();
+
+        await oauthResponse
+          .statusCode(200)
+          .extract('$.access_token', 'authToken')
+          .execute();
 
         console.log('✅ OAuth2 authentication successful - token obtained');
         return;
@@ -1518,12 +1687,212 @@ export class TestSetup {
   }
 
   /**
+   * Generate global setup file with automatic Mocha hooks (no manual calls needed)
+   */
+  private generateGlobalSetupFile(): string {
+    return `import { restified } from 'restifiedts';
+import * as dotenv from 'dotenv';
+
+// Load environment variables from .env file
+dotenv.config();
+
+/**
+ * Global Test Setup and Teardown
+ * 
+ * This file automatically configures RestifiedTS for all tests.
+ * No need to manually call setup/cleanup in individual test files.
+ * 
+ * Configuration is applied once before all tests run and
+ * cleanup is performed once after all tests complete.
+ * 
+ * USAGE:
+ * 1. Include this file in your Mocha configuration:
+ *    - Add to .mocharc.json: "require": ["tests/setup/global-setup.ts"]
+ *    - Or use --require flag: mocha --require tests/setup/global-setup.ts
+ * 2. Your individual tests can focus on test logic without setup/teardown
+ * 3. Use utility functions like getBaseURL(), getAuthToken() in your tests
+ */
+
+// ========================================
+// GLOBAL SETUP - Runs once before all tests
+// ========================================
+before(async function() {
+  this.timeout(30000); // Allow time for authentication
+  
+  console.log('🚀 Initializing RestifiedTS Global Test Environment...');
+  
+  // Set global variables from environment
+  const baseURL = process.env.API_BASE_URL || 'https://jsonplaceholder.typicode.com';
+  const timeout = parseInt(process.env.API_TIMEOUT || '30000');
+  
+  // Set global variables that can be used in all tests
+  restified.setGlobalVariable('baseURL', baseURL);
+  restified.setGlobalVariable('timeout', timeout);
+  restified.setGlobalVariable('userAgent', 'RestifiedTS-TestSuite/1.0');
+  
+  console.log(\`📡 Base URL configured: \${baseURL}\`);
+  console.log(\`⏱️  Default timeout: \${timeout}ms\`);
+
+  // Real-world authentication: Obtain token dynamically
+  await authenticateAndSetTokens();
+  
+  console.log('✅ Global test environment initialized successfully');
+});
+
+// ========================================
+// GLOBAL TEARDOWN - Runs once after all tests
+// ========================================
+after(async function() {
+  this.timeout(10000);
+  
+  console.log('🧹 Cleaning up RestifiedTS Global Test Environment...');
+  
+  try {
+    // Cleanup RestifiedTS resources
+    await restified.cleanup();
+    console.log('✅ Global test environment cleanup completed successfully');
+  } catch (error: any) {
+    console.error('❌ Global cleanup error:', error?.message || error);
+  }
+});
+
+// ========================================
+// BEFORE EACH TEST - Clear local variables
+// ========================================
+beforeEach(function() {
+  // Clear local variables before each test to ensure test isolation
+  restified.clearLocalVariables();
+});
+
+/**
+ * Real-world authentication pattern:
+ * 1. Call authentication endpoint with credentials
+ * 2. Extract token from response
+ * 3. Set as global variable for all subsequent tests
+ */
+async function authenticateAndSetTokens() {
+  try {
+    // Option 1: Use static token from environment (for development/testing)
+    if (process.env.AUTH_TOKEN) {
+      console.log('🔑 Using static AUTH_TOKEN from environment');
+      restified.setGlobalVariable('authToken', process.env.AUTH_TOKEN);
+      return;
+    }
+
+    // Option 2: Dynamic authentication (real-world pattern)
+    if (process.env.AUTH_USERNAME && process.env.AUTH_PASSWORD) {
+      console.log('🔐 Obtaining AUTH_TOKEN dynamically via API call...');
+      
+      const authURL = process.env.AUTH_SERVICE_URL || process.env.API_BASE_URL || 'https://jsonplaceholder.typicode.com';
+      
+      const response = await restified
+        .given()
+          .baseURL(authURL)
+          .contentType('application/json')
+          .jsonBody({
+            username: process.env.AUTH_USERNAME,
+            password: process.env.AUTH_PASSWORD,
+            grant_type: 'password'
+          })
+        .when()
+          .post('/auth/login')
+          .execute();
+
+      await response
+        .statusCode(200)
+        .extract('$.access_token', 'authToken')
+        .extract('$.refresh_token', 'refreshToken')
+        .execute();
+
+      console.log('✅ Dynamic authentication successful - token obtained and stored');
+      return;
+    }
+
+    // Option 3: OAuth2 Client Credentials flow
+    if (process.env.OAUTH2_CLIENT_ID && process.env.OAUTH2_CLIENT_SECRET) {
+      console.log('🔒 Obtaining OAuth2 token via client credentials flow...');
+      
+      const oauthURL = process.env.OAUTH2_TOKEN_URL || \`\${process.env.API_BASE_URL || 'https://jsonplaceholder.typicode.com'}/oauth\`;
+      
+      const oauthResponse = await restified
+        .given()
+          .baseURL(oauthURL)
+          .contentType('application/x-www-form-urlencoded')
+          .formBody({
+            grant_type: 'client_credentials',
+            client_id: process.env.OAUTH2_CLIENT_ID,
+            client_secret: process.env.OAUTH2_CLIENT_SECRET,
+            scope: process.env.OAUTH2_SCOPE || 'api:read api:write'
+          })
+        .when()
+          .post('/token')
+          .execute();
+
+      await oauthResponse
+        .statusCode(200)
+        .extract('$.access_token', 'authToken')
+        .execute();
+
+      console.log('✅ OAuth2 authentication successful - token obtained');
+      return;
+    }
+
+    // Option 4: API Key authentication
+    if (process.env.API_KEY) {
+      console.log('🗝️  Using API_KEY authentication');
+      restified.setGlobalVariable('apiKey', process.env.API_KEY);
+      return;
+    }
+
+    console.warn('⚠️  No authentication configured - tests may fail if API requires auth');
+    
+  } catch (error: any) {
+    console.error('❌ Authentication failed:', error?.message || error);
+    throw new Error(\`Authentication setup failed: \${error?.message || error}\`);
+  }
+}
+
+// ========================================
+// UTILITY FUNCTIONS FOR TESTS  
+// ========================================
+
+/**
+ * Get the configured base URL for tests
+ */
+export function getBaseURL(): string {
+  return restified.getGlobalVariable('baseURL') || process.env.API_BASE_URL || 'https://jsonplaceholder.typicode.com';
+}
+
+/**
+ * Get the configured auth token for tests
+ */
+export function getAuthToken(): string {
+  return restified.getGlobalVariable('authToken') || process.env.AUTH_TOKEN || '';
+}
+
+/**
+ * Get the configured API key for tests
+ */
+export function getApiKey(): string {
+  return restified.getGlobalVariable('apiKey') || process.env.API_KEY || '';
+}
+
+/**
+ * Check if authentication is configured
+ */
+export function isAuthConfigured(): boolean {
+  return !!(getAuthToken() || getApiKey());
+}
+`;
+  }
+
+  /**
    * Generate fixtures example test
    */
   private generateFixturesExampleTest(): string {
     return `import { restified } from 'restifiedts';
 import { expect } from 'chai';
-import { TestSetup } from '../setup/global-setup';
+import { TestSetup } from '../setup/manual-setup';
 import { TestData, UserData, ApiResponses } from '../fixtures/test-data';
 
 /**
@@ -1594,7 +1963,7 @@ describe('Fixtures Examples @integration', function() {
   private generateRealWorldAuthTest(): string {
     return `import { restified } from 'restifiedts';
 import { expect } from 'chai';
-import { TestSetup } from '../setup/global-setup';
+import { TestSetup } from '../setup/manual-setup';
 
 /**
  * Real-world authentication patterns with RestifiedTS
@@ -1611,23 +1980,24 @@ describe('Real-World Authentication @integration', function() {
   });
 
   it('should use dynamically obtained bearer token', async function() {
-    await restified
+    const response = await restified
       .given()
         .baseURL(process.env.API_BASE_URL || 'https://jsonplaceholder.typicode.com')
         .bearerToken('{{authToken}}')
         .header('Content-Type', 'application/json')
       .when()
         .get('/posts/1')
-        .execute()
-      .then()
-        .statusCode(200)
-        .jsonPath('$.id', 1)
-        .jsonPath('$.title').exists()
         .execute();
+
+    await response
+      .statusCode(200)
+      .jsonPath('$.id', 1)
+      .jsonPathExists('$.title')
+      .execute();
   });
 
   it('should handle protected endpoints with extracted token', async function() {
-    await restified
+    const response = await restified
       .given()
         .baseURL(process.env.API_BASE_URL || 'https://jsonplaceholder.typicode.com')
         .bearerToken('{{authToken}}')
@@ -1638,11 +2008,12 @@ describe('Real-World Authentication @integration', function() {
         })
       .when()
         .post('/posts')
-        .execute()
-      .then()
-        .statusCode(201)
-        .jsonPath('$.title', 'Test Post')
         .execute();
+
+    await response
+      .statusCode(201)
+      .jsonPath('$.title', 'Test Post')
+      .execute();
   });
 });
 `;
@@ -1655,7 +2026,7 @@ describe('Real-World Authentication @integration', function() {
     return `import { restified } from 'restifiedts';
 import { expect } from 'chai';
 import { faker } from '@faker-js/faker';
-import { TestSetup } from '../setup/global-setup';
+import { TestSetup } from '../setup/manual-setup';
 import { TestData } from '../fixtures/test-data';
 
 /**
@@ -1667,7 +2038,8 @@ describe('Faker.js Integration @unit', function() {
     await TestSetup.configure();
     
     // Set faker locale from environment or default to English
-    faker.setLocale(process.env.FAKER_LOCALE || 'en');
+    // Note: In newer versions of Faker, locale is handled differently
+    // faker.locale = process.env.FAKER_LOCALE || 'en';
     
     // Set seed for reproducible tests if provided
     if (process.env.MOCK_DATA_SEED) {
@@ -1723,8 +2095,8 @@ describe('Faker.js Integration @unit', function() {
 
     await response
       .statusCode(201)
-      .jsonPath('$.name').exists()
-      .jsonPath('$.email').exists()
+      .jsonPathExists('$.name')
+      .jsonPathExists('$.email')
       .execute();
   });
 });
@@ -1739,7 +2111,7 @@ describe('Faker.js Integration @unit', function() {
 import { expect } from 'chai';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
-import { TestSetup } from '../setup/global-setup';
+import { TestSetup } from '../setup/manual-setup';
 import { TestData, Schemas } from '../fixtures/test-data';
 
 /**
@@ -1815,8 +2187,8 @@ describe('Schema Validation @unit', function() {
 
     await response
       .statusCode(200)
-      .jsonPath('$').isArray()
-      .jsonPath('$.length').equals(5)
+      .jsonPathExists('$')
+      .jsonPath('$.length', 5)
       .execute();
 
     const posts = response.getData();

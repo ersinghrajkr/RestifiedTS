@@ -69,6 +69,7 @@ export class GraphQLClient {
       headers: {},
       introspection: false,
       defaultVariables: {},
+      httpClient: undefined,
       ...config,
       endpoint: config.endpoint || '/graphql'
     };

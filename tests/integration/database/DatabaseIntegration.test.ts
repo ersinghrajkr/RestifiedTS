@@ -35,7 +35,11 @@ class MockDatabase implements MockDatabaseConnection {
 
   async beginTransaction() {
     this.transactionActive = true;
-    this.transactionData = new Map(this.data);
+    // Create a backup of current data state
+    this.transactionData = new Map();
+    this.data.forEach((value, key) => {
+      this.transactionData.set(key, [...value]); // Deep copy arrays
+    });
   }
 
   async commit() {
@@ -44,7 +48,11 @@ class MockDatabase implements MockDatabaseConnection {
   }
 
   async rollback() {
-    this.data = new Map(this.transactionData);
+    // Restore data to the state before transaction began
+    this.data = new Map();
+    this.transactionData.forEach((value, key) => {
+      this.data.set(key, [...value]); // Deep copy arrays back
+    });
     this.transactionActive = false;
     this.transactionData.clear();
   }
@@ -101,6 +109,12 @@ class MockDatabase implements MockDatabaseConnection {
     // Handle WHERE conditions
     if (sql.includes('WHERE')) {
       return records.filter(record => {
+        // Handle IN clause with array
+        if (sql.includes('IN (?)') && params.length > 0 && Array.isArray(params[0])) {
+          const inValues = params[0];
+          return inValues.some((value: any) => Object.values(record).includes(value));
+        }
+        
         // Simple parameter matching
         if (params.length > 0) {
           return Object.values(record).some(value => 
@@ -142,8 +156,61 @@ class MockDatabase implements MockDatabaseConnection {
     const tableName = tableMatch[1];
     const records = this.data.get(tableName) || [];
     
-    // Simple update simulation
     let updatedCount = 0;
+    
+    // Handle special case: UPDATE counters SET value = value + 1 WHERE name = ?
+    if (sql.includes('value = value + 1')) {
+      records.forEach(record => {
+        if (params.length > 0 && record.name === params[0]) {
+          record.value = (record.value || 0) + 1;
+          updatedCount++;
+        }
+      });
+      return { affectedRows: updatedCount };
+    }
+    
+    // Handle balance updates for transaction tests
+    if (sql.includes('balance = balance')) {
+      const isDebit = sql.includes('balance - ');
+      const isCredit = sql.includes('balance + ');
+      
+      records.forEach(record => {
+        if (params.length >= 2) {
+          const amount = params[0];
+          const nameCondition = params[1];
+          
+          if (record.name === nameCondition) {
+            if (isDebit) {
+              record.balance = (record.balance || 0) - amount;
+            } else if (isCredit) {
+              record.balance = (record.balance || 0) + amount;
+            }
+            updatedCount++;
+          }
+        }
+      });
+      return { affectedRows: updatedCount };
+    }
+    
+    // Handle standard SET field = ? WHERE id = ? updates
+    if (sql.includes('SET') && sql.includes('WHERE id = ?')) {
+      const setMatch = sql.match(/SET\s+(\w+)\s*=\s*\?/i);
+      if (setMatch && params.length >= 2) {
+        const fieldName = setMatch[1];
+        const newValue = params[0];
+        const targetId = params[1];
+        
+        records.forEach(record => {
+          if (record.id === targetId) {
+            record[fieldName] = newValue;
+            updatedCount++;
+          }
+        });
+        return { affectedRows: updatedCount };
+      }
+    }
+    
+    // Simple update simulation for other cases
     records.forEach(record => {
       if (params.length > 0 && record.id === params[params.length - 1]) {
         Object.keys(record).forEach((key, index) => {
@@ -168,11 +235,23 @@ class MockDatabase implements MockDatabaseConnection {
     let deletedCount = 0;
     if (params.length > 0) {
       const initialLength = records.length;
-      const filtered = records.filter(record => 
-        !params.some(param => record.id === param)
-      );
-      this.data.set(tableName, filtered);
-      deletedCount = initialLength - filtered.length;
+      
+      // Handle IN clause with array
+      if (sql.includes('IN (?)') && Array.isArray(params[0])) {
+        const inValues = params[0];
+        const filtered = records.filter(record => 
+          !inValues.some((value: any) => record.id === value)
+        );
+        this.data.set(tableName, filtered);
+        deletedCount = initialLength - filtered.length;
+      } else {
+        // Simple parameter matching
+        const filtered = records.filter(record => 
+          !params.some(param => record.id === param)
+        );
+        this.data.set(tableName, filtered);
+        deletedCount = initialLength - filtered.length;
+      }
     } else {
       deletedCount = records.length;
       this.data.set(tableName, []);

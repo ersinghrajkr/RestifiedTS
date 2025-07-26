@@ -199,8 +199,8 @@ GRAPHQL_PLAYGROUND=false
 
 ```bash
 # Corporate Proxy Support
-HTTP_PROXY=http://proxy.company.com:8080
-HTTPS_PROXY=https://proxy.company.com:8080
+HTTP_PROXY=http://proxy.example.com:8080
+HTTPS_PROXY=https://proxy.example.com:8080
 NO_PROXY=localhost,127.0.0.1,*.local
 
 # SSL Certificate Configuration
@@ -393,8 +393,8 @@ npx restifiedts generate --type crud --name UserCRUD
 ### Scenario 1: Corporate Environment
 ```bash
 # Corporate proxy and custom certificates
-HTTP_PROXY=http://proxy.company.com:8080
-HTTPS_PROXY=https://proxy.company.com:8080
+HTTP_PROXY=http://proxy.example.com:8080
+HTTPS_PROXY=https://proxy.example.com:8080
 SSL_VERIFY=true
 SSL_CA_PATH=/etc/ssl/certs/company-ca.pem
 ```
