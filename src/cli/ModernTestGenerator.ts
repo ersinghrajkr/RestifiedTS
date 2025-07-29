@@ -247,11 +247,55 @@ describe('{{className}} API Tests', function() {
   });
 });`);
 
-    // Authentication Test Template
+    // Authentication template with comprehensive global auth patterns
     this.templates.set('auth', `import { restified } from 'restifiedts';
 import { expect } from 'chai';
 
+/**
+ * {{className}} Authentication Tests
+ * 
+ * 🔑 GLOBAL AUTH SETUP - Set once, use everywhere with override capability
+ * 
+ * 📋 Method 1: Environment Variables (Recommended)
+ * Set in .env file:
+ * AUTH_TOKEN=your-default-bearer-token
+ * ADMIN_TOKEN=your-admin-token
+ * API_KEY=your-api-key
+ * API_BASE_URL={{baseURL}}
+ * 
+ * 📋 Method 2: Global Configuration Setup
+ * Add to package.json test script:
+ * "test": "mocha -r ./tests/setup.js 'tests/**/*.test.js'"
+ * 
+ * Create tests/setup.js:
+ * restified.updateConfig({
+ *   headers: { 'Authorization': \`Bearer \${process.env.AUTH_TOKEN}\` }
+ * });
+ */
+
 describe('{{className}} Authentication Tests', function() {
+  this.timeout(30000);
+
+  // 🌍 GLOBAL AUTH SETUP - runs once for entire test suite
+  before(function() {
+    console.log('🔑 Setting up global authentication configuration...');
+    
+    // Method 1: Global configuration with environment variables
+    restified.updateConfig({
+      headers: {
+        'Authorization': \`Bearer \${process.env.AUTH_TOKEN || 'default-test-token'}\`,
+        'X-API-Key': process.env.API_KEY || 'default-api-key'
+      }
+    });
+
+    // Method 2: Global variables approach
+    restified.setGlobalVariable('authToken', process.env.AUTH_TOKEN || 'test-auth-token');
+    restified.setGlobalVariable('apiKey', process.env.API_KEY || 'test-api-key');
+    
+    console.log('✅ Global auth configured - all tests will use AUTH_TOKEN automatically');
+    console.log('💡 Individual tests can override by using .bearerToken() or .apiKey() methods');
+  });
+
   afterAll(async function() {
     await restified.cleanup();
   });
@@ -260,85 +304,343 @@ describe('{{className}} Authentication Tests', function() {
     restified.clearLocalVariables();
   });
 
-  it('should login with valid credentials', async function() {
-    this.timeout(10000);
-    
-    const loginResponse = await restified
-      .given()
-        .baseURL('{{baseURL}}')
-        .header('Content-Type', 'application/json')
-        .body({
-          username: 'testuser',
-          password: 'testpass'
-        })
-      .when()
-        .post('/auth/login')
+  describe('Global Authentication Tests', function() {
+    it('should use global auth automatically - no .bearerToken() needed', async function() {
+      this.timeout(10000);
+      
+      // Global auth is automatically applied from before() hook
+      const response = await restified
+        .given()
+          .baseURL('{{baseURL}}')
+          // No .bearerToken() call needed - using global config
+        .when()
+          .get('/api/protected')
+          .execute();
+
+      await response
+        .statusCode(200)
+        .jsonPath('$.authenticated', true)
         .execute();
+        
+      console.log('✅ Global auth worked! Protected endpoint accessed without explicit .bearerToken()');
+    });
 
-    await loginResponse
-      .statusCode(200)
-      .jsonPath('$.token').isString()
-      .extract('$.token', 'authToken')
-      .execute();
+    it('should access user profile with global authentication', async function() {
+      this.timeout(10000);
+      
+      const response = await restified
+        .given()
+          .baseURL('{{baseURL}}')
+          // Global auth applied automatically
+        .when()
+          .get('/api/user/profile')
+          .execute();
 
-    // Store token globally for other tests
-    restified.setGlobalVariable('authToken', restified.getGlobalVariable('authToken'));
-    expect(restified.getGlobalVariable('authToken')).to.exist;
+      await response
+        .statusCode(200)
+        .jsonPath('$.user.id').exists()
+        .jsonPath('$.user.email').exists()
+        .execute();
+        
+      console.log('✅ Global auth working - user profile retrieved automatically');
+    });
   });
 
-  it('should access protected resource with token', async function() {
-    this.timeout(10000);
-    
-    // Use the token from previous test
-    const protectedResponse = await restified
-      .given()
-        .baseURL('{{baseURL}}')
-        .bearerToken('{{authToken}}')
-      .when()
-        .get('/protected/profile')
-        .execute();
+  describe('Override Global Authentication', function() {
+    it('should override global auth for specific test', async function() {
+      this.timeout(10000);
+      
+      // Override global auth for this specific test
+      const response = await restified
+        .given()
+          .baseURL('{{baseURL}}')
+          .bearerToken('{{adminToken}}') // Override global auth
+        .when()
+          .get('/api/admin/users')
+          .execute();
 
-    await protectedResponse
-      .statusCode(200)
-      .jsonPath('$.user').isObject()
-      .execute();
+      await response
+        .statusCode(200)
+        .jsonPath('$.users').isArray()
+        .execute();
+        
+      console.log('✅ Auth override worked! Admin token used instead of global token');
+    });
+
+    it('should override global headers for different API key', async function() {
+      this.timeout(10000);
+      
+      const response = await restified
+        .given()
+          .baseURL('{{baseURL}}')
+          .header('X-API-Key', '{{premiumApiKey}}') // Override global API key
+        .when()
+          .get('/api/premium/features')
+          .execute();
+
+      await response
+        .statusCode(200)
+        .jsonPath('$.premium', true)
+        .execute();
+        
+      console.log('✅ API key override worked! Premium API key used instead of default');
+    });
+
+    it('should use different service with separate auth', async function() {
+      this.timeout(10000);
+      
+      const response = await restified
+        .given()
+          .baseURL('{{secondaryServiceURL}}')
+          .basicAuth('{{serviceUsername}}', '{{servicePassword}}') // Different auth method
+        .when()
+          .get('/api/service/status')
+          .execute();
+
+      await response
+        .statusCode(200)
+        .jsonPath('$.service', 'secondary')
+        .execute();
+        
+      console.log('✅ Basic auth override worked! Used different auth method for secondary service');
+    });
   });
 
-  it('should reject invalid credentials', async function() {
-    this.timeout(10000);
-    
-    const loginResponse = await restified
-      .given()
-        .baseURL('{{baseURL}}')
-        .header('Content-Type', 'application/json')
-        .body({
-          username: 'invalid',
-          password: 'invalid'
-        })
-      .when()
-        .post('/auth/login')
+  describe('Dynamic Authentication Flows', function() {
+    it('should perform login flow and extract token', async function() {
+      this.timeout(15000);
+      
+      // Step 1: Login and get token
+      const loginResponse = await restified
+        .given()
+          .baseURL('{{baseURL}}')
+          .body({
+            email: '{{userEmail}}',
+            password: '{{userPassword}}'
+          })
+        .when()
+          .post('/api/auth/login')
+          .execute();
+
+      await loginResponse
+        .statusCode(200)
+        .jsonPath('$.token').exists()
+        .extract('$.token', 'dynamicAuthToken')
         .execute();
 
-    await loginResponse
-      .statusCode(401)
-      .execute();
-  });
+      // Step 2: Use extracted token for protected request
+      const protectedResponse = await restified
+        .given()
+          .baseURL('{{baseURL}}')
+          .bearerToken('{{dynamicAuthToken}}') // Use extracted token
+        .when()
+          .get('/api/user/dashboard')
+          .execute();
 
-  it('should reject access without token', async function() {
-    this.timeout(10000);
-    
-    const protectedResponse = await restified
-      .given()
-        .baseURL('{{baseURL}}')
-      .when()
-        .get('/protected/profile')
+      await protectedResponse
+        .statusCode(200)
+        .jsonPath('$.dashboard').exists()
+        .execute();
+        
+      console.log('✅ Dynamic auth flow worked! Logged in and used extracted token');
+    });
+
+    it('should handle token refresh flow', async function() {
+      this.timeout(20000);
+      
+      // Step 1: Get refresh token
+      const refreshResponse = await restified
+        .given()
+          .baseURL('{{baseURL}}')
+          .header('X-Refresh-Token', '{{refreshToken}}')
+        .when()
+          .post('/api/auth/refresh')
+          .execute();
+
+      await refreshResponse
+        .statusCode(200)
+        .jsonPath('$.accessToken').exists()
+        .extract('$.accessToken', 'newAccessToken')
         .execute();
 
-    await protectedResponse
-      .statusCode(401)
-      .execute();
+      // Step 2: Use new access token
+      const apiResponse = await restified
+        .given()
+          .baseURL('{{baseURL}}')
+          .bearerToken('{{newAccessToken}}')
+        .when()
+          .get('/api/user/settings')
+          .execute();
+
+      await apiResponse
+        .statusCode(200)
+        .execute();
+        
+      console.log('✅ Token refresh flow worked! Got new token and accessed protected resource');
+    });
   });
-});`);
+
+  describe('Authentication Edge Cases', function() {
+    it('should handle expired token gracefully', async function() {
+      this.timeout(10000);
+      
+      const response = await restified
+        .given()
+          .baseURL('{{baseURL}}')
+          .bearerToken('{{expiredToken}}')
+        .when()
+          .get('/api/protected')
+          .execute();
+
+      await response
+        .statusCode(401)
+        .jsonPath('$.error', 'token_expired')
+        .execute();
+        
+      console.log('✅ Expired token correctly rejected with proper error message');
+    });
+
+    it('should handle missing authentication', async function() {
+      this.timeout(10000);
+      
+      // Temporarily clear global auth for this test
+      const response = await restified
+        .given()
+          .baseURL('{{baseURL}}')
+          .header('Authorization', '') // Clear auth header
+        .when()
+          .get('/api/protected')
+          .execute();
+
+      await response
+        .statusCode(401)
+        .jsonPath('$.error').contains('authentication')
+        .execute();
+        
+      console.log('✅ Missing auth correctly rejected');
+    });
+
+    it('should handle invalid API key format', async function() {
+      this.timeout(10000);
+      
+      const response = await restified
+        .given()
+          .baseURL('{{baseURL}}')
+          .header('X-API-Key', 'invalid-format-123')
+        .when()
+          .get('/api/data')
+          .execute();
+
+      await response
+        .statusCode(403)
+        .jsonPath('$.error', 'invalid_api_key')
+        .execute();
+        
+      console.log('✅ Invalid API key format correctly rejected');
+    });
+  });
+
+  describe('Multi-Service Authentication', function() {
+    it('should authenticate with multiple services', async function() {
+      this.timeout(15000);
+      
+      // Service 1: Main API
+      const service1Response = await restified
+        .given()
+          .baseURL('{{mainServiceURL}}')
+          .bearerToken('{{mainServiceToken}}')
+        .when()
+          .get('/api/data')
+          .execute();
+
+      await service1Response
+        .statusCode(200)
+        .extract('$.userId', 'mainUserId')
+        .execute();
+
+      // Service 2: Analytics API (different auth)
+      const service2Response = await restified
+        .given()
+          .baseURL('{{analyticsServiceURL}}')
+          .header('X-Analytics-Key', '{{analyticsApiKey}}')
+          .queryParam('userId', '{{mainUserId}}')
+        .when()
+          .get('/api/analytics/user')
+          .execute();
+
+      await service2Response
+        .statusCode(200)
+        .jsonPath('$.analytics').exists()
+        .execute();
+        
+      console.log('✅ Multi-service authentication worked! Different auth methods for different services');
+    });
+  });
+
+  // Cleanup - restore any global settings if needed
+  after(function() {
+    // Optional: Reset to default state
+    // restified.clearGlobalVariables();
+  });
+});
+
+/*
+ * Environment Variables Setup Guide:
+ * 
+ * Create a .env file in your project root:
+ * 
+ * # Primary Authentication
+ * AUTH_TOKEN=your-bearer-token-here
+ * API_KEY=your-api-key-here
+ * 
+ * # Admin/Premium Access
+ * ADMIN_TOKEN=admin-bearer-token
+ * PREMIUM_API_KEY=premium-api-key
+ * 
+ * # Service URLs
+ * BASE_URL={{baseURL}}
+ * SECONDARY_SERVICE_URL=https://service2.example.com
+ * MAIN_SERVICE_URL=https://main.example.com
+ * ANALYTICS_SERVICE_URL=https://analytics.example.com
+ * 
+ * # User Credentials for Dynamic Auth
+ * USER_EMAIL=test@example.com
+ * USER_PASSWORD=test-password
+ * REFRESH_TOKEN=your-refresh-token
+ * 
+ * # Service-Specific Auth
+ * SERVICE_USERNAME=service-user
+ * SERVICE_PASSWORD=service-pass
+ * ANALYTICS_API_KEY=analytics-key
+ * 
+ * # Test Tokens
+ * EXPIRED_TOKEN=expired-token-for-testing
+ * 
+ * Usage Summary:
+ * 
+ * 🌍 GLOBAL AUTH SETUP (Set Once):
+ *   - Environment: AUTH_TOKEN=your-token
+ *   - Or in before(): restified.updateConfig({headers: {'Authorization': 'Bearer token'}})
+ * 
+ * ✅ MOST TESTS USE GLOBAL AUTH AUTOMATICALLY:
+ *   - No .bearerToken() needed in each test
+ *   - All requests automatically include global auth
+ * 
+ * 🔄 OVERRIDE WHEN NEEDED:  
+ *   - .bearerToken('override-token') 
+ *   - .apiKey('key', 'X-API-Key')
+ *   - .basicAuth('user', 'pass')
+ *   - .header('Authorization', 'Bearer specific-token')
+ * 
+ * 📈 BENEFITS:
+ *   - Set once, use everywhere
+ *   - Easy to change global auth
+ *   - Flexible override per test
+ *   - Clean test code
+ *   - Environment-based configuration
+ *   - Dynamic auth flows with token extraction
+ *   - Multi-service authentication patterns
+ */`);
 
     // Multi-Client Test Template
     this.templates.set('multi-client', `import { restified } from 'restifiedts';

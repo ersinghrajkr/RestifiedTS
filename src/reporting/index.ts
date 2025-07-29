@@ -14,6 +14,13 @@
 export { DiffReporter } from './DiffReporter';
 export { ReportingManager } from './ReportingManager';
 
+// Mocha integration for automatic reporting
+export { 
+  MochaReportingIntegration,
+  setupMochaReporting,
+  getMochaIntegration
+} from './MochaReportingIntegration';
+
 // Re-export reporting types for convenience
 export type {
   ReportingConfig,

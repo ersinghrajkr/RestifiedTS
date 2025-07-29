@@ -6,7 +6,7 @@
 
 **RestifiedTS** is a production-grade API testing framework built in TypeScript, inspired by Java's RestAssured. Test REST APIs, GraphQL endpoints, and WebSocket connections with a fluent DSL, comprehensive features, and extensive reporting capabilities.
 
-> **🎉 NEW in v1.2.0:** Complete comprehensive features demo showcasing ALL RestifiedTS capabilities in production-ready examples!
+> **🎉 NEW in v1.2.5:** **Zero-Configuration Mochawesome Integration!** RestifiedTS now automatically detects Mocha environments and attaches HTTP request/response data to test reports without any setup required!
 
 ## ✨ Key Features
 
@@ -21,7 +21,8 @@
 ✅ **Variable Resolution** - Dynamic payloads with Faker.js integration
 ✅ **Authentication Support** - Bearer, Basic, API Key, OAuth2
 ✅ **Advanced Schema Validation** - Joi, Zod, AJV multi-validator support
-✅ **Enhanced Reporting** - Custom reports with performance and security metrics
+✅ **Zero-Config Mochawesome Integration** - Automatic request/response context attachment
+✅ **Comprehensive Test Analytics** - Performance metrics, error tracking, and execution flow
 ✅ **CLI Tools** - Generate advanced test templates and project scaffolding
 
 ## 🚀 Quick Start
@@ -31,6 +32,9 @@
 ```bash
 npm install restifiedts
 npm install --save-dev mocha chai @types/mocha @types/chai @types/node typescript ts-node
+
+# Optional: For enhanced HTML reports with automatic context attachment
+npm install --save-dev mochawesome mochawesome-report-generator mochawesome-merge
 ```
 
 ### Your First Test
@@ -72,21 +76,186 @@ describe('My First API Test', function() {
 });
 ```
 
-### Run Your Test
+### Run Your Tests
 
-Add to `package.json`:
+Add comprehensive test scripts to `package.json`:
 
 ```json
 {
   "scripts": {
-    "test": "mocha --require ts-node/register 'tests/**/*.ts'"
+    "test": "npm run test:clean && npm run test:all:json && npm run test:merge:all",
+    "test:unit": "npm run test:clean && npm run test:unit:json && npm run test:merge:unit",
+    "test:integration": "npm run test:clean && npm run test:integration:json && npm run test:merge:integration",
+    "test:smoke": "npm run test:clean && npm run test:smoke:json && npm run test:merge:smoke",
+    "test:regression": "npm run test:clean && npm run test:regression:json && npm run test:merge:regression",
+    "test:comprehensive": "npm run test:systems && npm run test:unit && npm run test:integration && npm run test:smoke && npm run test:regression && npm run test:merge:comprehensive",
+    "test:coverage": "nyc npm run test:all:json",
+    "test:clean": "rimraf output && mkdirp output/reports && mkdirp output/snapshots && mkdirp output/temp && mkdirp output/logs"
   }
 }
 ```
 
+### Enhanced Reporting Commands
+
+RestifiedTS includes comprehensive reporting with request/response logging:
+
 ```bash
+# Run all tests with comprehensive reporting
 npm test
+
+# Run specific test types
+npm run test:unit         # Unit tests only
+npm run test:integration  # Integration tests only
+npm run test:smoke        # Smoke tests (@smoke tagged)
+npm run test:regression   # Regression tests (@regression tagged)
+
+# Run comprehensive test suite (all test types)
+npm run test:comprehensive
+
+# Run with coverage reporting
+npm run test:coverage
+
+# Generate standalone reports
+npm run report:html       # Generate HTML reports from existing JSON
 ```
+
+### 📊 Enhanced Test Reports
+
+RestifiedTS automatically captures and includes in Mochawesome reports:
+- ✅ **Request Payloads** - Full HTTP request details
+- ✅ **Response Payloads** - Complete response data
+- ✅ **Error Stack Traces** - Detailed error information
+- ✅ **Performance Metrics** - Response times and payload sizes
+- ✅ **Variable Resolution** - Template variable substitutions
+- ✅ **Test Execution Flow** - Complete test lifecycle tracking
+
+Reports are generated in `output/reports/` with interactive HTML views.
+
+### 🔧 Automatic Mochawesome Integration
+
+**🎉 NEW:** RestifiedTS now automatically detects Mocha environments and integrates with Mochawesome **without any configuration**!
+
+**✅ Zero Configuration Required**
+Simply use RestifiedTS in your tests and run with Mochawesome reporter:
+
+```bash
+npx mocha tests/**/*.ts --reporter mochawesome --reporter-options addContext=true
+```
+
+**✅ Automatic Context Attachment**
+Every HTTP request made through RestifiedTS automatically attaches:
+- 🔍 **HTTP Request Details** - Method, URL, headers, body, timestamp
+- ✅ **HTTP Response Details** - Status, headers, data, response time, timestamp  
+- ❌ **Error Details** - Stack traces and error context (when applicable)
+
+**✅ Works Out of the Box**
+```json
+{
+  "scripts": {
+    "test": "mocha 'tests/**/*.ts' --reporter mochawesome --reporter-options addContext=true",
+    "test:html": "mocha 'tests/**/*.ts' --reporter mochawesome --reporter-options reportDir=reports,reportFilename=test-report,html=true"
+  }
+}
+```
+
+**✅ Rich HTML Reports**
+Reports are automatically generated with:
+- Interactive test result views
+- Expandable request/response details
+- Performance metrics and timing information
+- Error context and stack traces
+- Test execution flow tracking
+
+**📋 Example Context Data**
+Each test automatically includes detailed context like:
+
+```typescript
+// Your test code
+const response = await restified
+  .given()
+    .baseURL('https://api.example.com')
+    .bearerToken('your-token')
+    .body({ name: 'John Doe' })
+  .when()
+    .post('/users')
+    .execute();
+```
+
+**Automatically generates in Mochawesome report:**
+- 🔍 **HTTP Request Details**
+  - Method: POST
+  - URL: https://api.example.com/users
+  - Headers: Authorization, Content-Type
+  - Body: { name: 'John Doe' }
+  - Timestamp: 2025-01-29T10:30:15.123Z
+
+- ✅ **HTTP Response Details**
+  - Status: 201 Created
+  - Headers: Content-Type, Location
+  - Data: { id: 123, name: 'John Doe' }
+  - Response Time: 245ms
+  - Timestamp: 2025-01-29T10:30:15.368Z
+
+**🔧 Troubleshooting**
+If you don't see request/response data in your reports:
+1. Ensure you're using the `mochawesome` reporter
+2. Add `--reporter-options addContext=true` to your mocha command
+3. Verify your tests are making HTTP requests through RestifiedTS DSL
+4. Check that tests are completing successfully (context attaches even to failed tests)
+
+### 🛡️ Corporate Proxy Support
+
+RestifiedTS automatically handles corporate proxies and firewalls:
+
+**Automatic Environment Variable Detection:**
+```bash
+# Set these environment variables
+export HTTP_PROXY=http://proxy.company.com:8080
+export HTTPS_PROXY=http://proxy.company.com:8080
+export NO_PROXY=localhost,127.0.0.1,*.company.com
+
+# With authentication
+export HTTP_PROXY=http://username:password@proxy.company.com:8080
+```
+
+**Manual Proxy Configuration:**
+```typescript
+import { restified } from 'restifiedts';
+
+// Configure proxy globally
+restified.updateConfig({
+  proxy: {
+    host: 'proxy.company.com',
+    port: 8080,
+    protocol: 'http',
+    username: 'your-username',
+    password: 'your-password'
+  }
+});
+
+// Now all requests will use the proxy automatically
+const response = await restified
+  .given()
+  .when()
+    .get('/api/data')
+    .execute();
+```
+
+**Per-Request Proxy:**
+```typescript
+const response = await restified
+  .given()
+    .proxy({
+      host: 'proxy.company.com',
+      port: 8080,
+      protocol: 'http'
+    })
+  .when()
+    .get('/api/data')
+    .execute();
+```
+
+See [Proxy Troubleshooting Guide](./docs/troubleshooting/PROXY-TROUBLESHOOTING.md) for detailed troubleshooting guide.
 
 ## 🔑 Essential Concepts
 
@@ -322,37 +491,72 @@ it('should create user with dynamic data', async function() {
 });
 ```
 
-## 🛠️ CLI Tools
+## 🛠️ CLI Tools & Project Management
 
-Generate test templates quickly:
+### Initialize a New RestifiedTS Project
 
 ```bash
-# Generate basic API test template
-npx restifiedts generate --type api --name User
+# Initialize RestifiedTS in current directory
+npx restifiedts init
 
-# Generate authentication test
-npx restifiedts generate --type auth --name Login
+# Initialize with force overwrite
+npx restifiedts init --force
+```
 
-# Generate multi-client test
-npx restifiedts generate --type multi-client --name Integration
+### Generate Test Files
 
-# Generate database integration test
+The CLI supports these test types:
+
+```bash
+# Basic API test
+npx restifiedts generate --type api --name UserAPI
+
+# Authentication test
+npx restifiedts generate --type auth --name LoginAuth
+
+# Multi-client integration test
+npx restifiedts generate --type multi-client --name ServiceIntegration
+
+# Database integration test
 npx restifiedts generate --type database --name UserDatabase
 
-# Generate performance test with Artillery
+# Performance test
 npx restifiedts generate --type performance --name LoadTest
 
-# Generate security test with ZAP
+# GraphQL test
+npx restifiedts generate --type graphql --name GraphQLQueries
+
+# WebSocket test
+npx restifiedts generate --type websocket --name RealtimeEvents
+
+# Security test
 npx restifiedts generate --type security --name SecurityScan
 
-# Generate unified orchestration test
-npx restifiedts generate --type unified --name ComprehensiveTest
+# Comprehensive test (all features)
+npx restifiedts generate --type comprehensive --name FullStackTest
 
-# Generate schema validation test
-npx restifiedts generate --type validation --name SchemaTest
+# Schema validation test
+npx restifiedts generate --type validation --name SchemaValidation
 
-# Initialize project structure
-npx restifiedts init
+# Unified test (API + Performance + Security)
+npx restifiedts generate --type unified --name UnifiedTest
+```
+
+### Advanced CLI Options
+
+```bash
+# Specify output directory
+npx restifiedts generate --type api --name UserAPI --output tests/api
+
+# Set base URL
+npx restifiedts generate --type api --name UserAPI --baseURL https://api.example.com
+
+# Generate complete test suite
+npx restifiedts generate --type api --name UserAPI --suite
+
+# Scaffold complete service test suite
+npx restifiedts scaffold --service UserService --baseURL https://api.example.com
+npx restifiedts scaffold --service UserService --include-graphql --include-websocket
 ```
 
 ## ⚙️ Configuration Guide
@@ -637,7 +841,7 @@ npx restifiedts config --env development
 npx restifiedts config --env production
 
 # Generate tests with specific configuration
-npx restifiedts generate --type api --name User --base-url https://api.example.com
+npx restifiedts generate --type api --name UserAPI --baseURL https://api.example.com
 ```
 
 ### 5. Different Environments
@@ -690,18 +894,27 @@ AUTH_TOKEN=your-auth-token-here
 
 ## 📖 Complete Documentation
 
-For comprehensive documentation, advanced features, configuration guides, and best practices, see:
+### 📚 **Comprehensive Guides**
 
-### 📄 [**RESTIFIEDTS-GUIDE.md**](./RESTIFIEDTS-GUIDE.md)
+- 📄 [**Complete RestifiedTS Guide**](./docs/guides/RESTIFIEDTS-GUIDE.md) - Full framework documentation
+- ⚙️ [**Configuration Guide**](./docs/guides/CONFIGURATION-GUIDE.md) - Environment configs, multi-instance setup
+- 🔧 [**TypeScript Guide**](./docs/guides/TYPESCRIPT-GUIDE.md) - Enhanced IntelliSense and type safety
+
+### 🛠️ **Troubleshooting & Support**
+
+- 🔍 [**Proxy Troubleshooting**](./docs/troubleshooting/PROXY-TROUBLESHOOTING.md) - Corporate firewall and proxy issues
+
+### 👥 **Development & Contributing**
+
+- 🤝 [**Contributing Guide**](./docs/development/CONTRIBUTING.md) - How to contribute to RestifiedTS
 
 The complete guide covers:
 
-- ⚙️ **Configuration Management** - Environment configs, multi-instance setup
 - 🔐 **Authentication & Token Management** - Bearer, OAuth2, refresh tokens
 - 🏗️ **Multi-Instance Architecture** - Service-oriented testing, runtime instances
 - 🔧 **Advanced Features** - Performance testing, schema validation, custom assertions
 - 📦 **Publishing to NPM** - Complete publishing workflow
-- 🐛 **Troubleshooting** - Common issues and solutions
+- 🐛 **Common Issues** - Troubleshooting guide with solutions
 
 ## 🎯 Generated Test Templates
 
@@ -1031,19 +1244,19 @@ Generate tests for advanced features:
 
 ```bash
 # Generate database integration test
-npx restifiedts generate --type database --name UserDatabase --db-type postgresql
+npx restifiedts generate --type database --name UserDatabase --baseURL https://api.example.com
 
 # Generate performance test with Artillery
-npx restifiedts generate --type performance --name LoadTest --target https://api.example.com
+npx restifiedts generate --type performance --name LoadTest --baseURL https://api.example.com
 
 # Generate security test with ZAP
-npx restifiedts generate --type security --name SecurityScan --zap-host localhost:8080
+npx restifiedts generate --type security --name SecurityScan --baseURL https://api.example.com
 
 # Generate unified orchestration test
-npx restifiedts generate --type unified --name ComprehensiveTest --include-all
+npx restifiedts generate --type unified --name ComprehensiveTest --baseURL https://api.example.com --suite
 
 # Generate schema validation test
-npx restifiedts generate --type validation --name SchemaTest --validators joi,zod,ajv
+npx restifiedts generate --type validation --name SchemaTest --baseURL https://api.example.com
 ```
 
 ## 🐛 Troubleshooting

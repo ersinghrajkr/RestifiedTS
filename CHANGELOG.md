@@ -5,7 +5,82 @@ All notable changes to RestifiedTS will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.2.1] - 2025-07-26
+## [1.2.2] - 2025-07-28
+
+### 🎨 Enhanced Developer Experience
+
+#### **Comprehensive TypeScript IntelliSense Improvements**
+- **NEW**: Detailed JSDoc comments with examples for all DSL methods
+- **ENHANCED**: Method parameter descriptions with usage examples
+- **ENHANCED**: Better type hints showing practical examples in IDE tooltips
+- **ENHANCED**: Comprehensive documentation for `IGivenStep`, `IWhenStep`, and `IThenStep` interfaces
+- **NEW**: TypeScript Developer Guide with IDE-specific setup instructions
+
+#### **CLI Generator Enhancements**
+- **ENHANCED**: Authentication template with comprehensive global auth patterns
+- **NEW**: Global authentication setup examples with override capabilities  
+- **NEW**: Dynamic authentication flows (login, token refresh, multi-service)
+- **NEW**: Environment variable integration examples in auth templates
+- **ENHANCED**: Complete authentication documentation in generated tests
+
+#### **Documentation Organization**
+- **MAJOR RESTRUCTURE**: Organized all documentation into clean `docs/` structure
+- **NEW**: `docs/guides/` - User-facing documentation
+- **NEW**: `docs/troubleshooting/` - Problem-solving guides  
+- **NEW**: `docs/development/` - Contributor resources
+- **NEW**: Comprehensive documentation index at `docs/README.md`
+- **CLEANED**: Root directory now contains only 3 essential files (vs 8 before)
+
+### 🔧 Technical Improvements
+
+#### **Type System Enhancements**
+- **FIXED**: Removed duplicate EnhancedTypes.ts file for cleaner codebase
+- **ENHANCED**: Single RestifiedTypes.ts with comprehensive JSDoc documentation
+- **IMPROVED**: Better IDE autocomplete and IntelliSense experience
+- **ENHANCED**: Type safety with detailed parameter descriptions
+
+#### **Code Organization**
+- **IMPROVED**: Cleaner project structure with organized documentation
+- **ENHANCED**: Better maintainability with consolidated type definitions
+- **FIXED**: All documentation links updated to new structure
+
+### 📚 New Documentation
+
+- **NEW**: [TypeScript Guide](./docs/guides/TYPESCRIPT-GUIDE.md) - Enhanced IDE experience
+- **NEW**: [Documentation Index](./docs/README.md) - Central navigation hub
+- **UPDATED**: All README links point to organized documentation structure
+
+### 🚀 For End Users
+
+This release significantly improves the developer experience with:
+- **Better IntelliSense** - Rich tooltips with examples in your IDE
+- **Enhanced CLI** - Comprehensive authentication examples in generated tests
+- **Cleaner Documentation** - Well-organized guides easy to find and follow
+- **Type Safety** - Better TypeScript support with detailed type information
+
+### 📋 Migration Notes
+
+No breaking changes - this is a pure enhancement release focused on developer experience improvements.
+
+---
+
+## [1.2.1] - 2025-07-28
+
+### 🚀 Major Features
+
+#### **Enhanced Mocha/Mochawesome Integration**
+- **NEW**: Automatic request/response payload logging in test reports
+- **NEW**: Complete error stack trace capture and reporting
+- **NEW**: Real-time test execution tracking with performance metrics
+- **NEW**: Automatic Mocha hooks setup for comprehensive reporting
+- **NEW**: Enhanced HTML reports with interactive request/response details
+
+#### **Comprehensive Reporting System**
+- **NEW**: `MochaReportingIntegration` class for seamless test integration
+- **NEW**: `setup-mocha.ts` helper for one-line reporting enablement
+- **NEW**: Request payload, response payload, and timing data in Mochawesome reports
+- **NEW**: Test lifecycle tracking (execution → suite → test → step)
+- **NEW**: Performance analytics and success rate tracking
 
 ### 🔧 Bug Fixes
 
@@ -14,10 +89,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Fixed**: All DSL chains properly separated between request execution and assertion execution
 - **Improved**: Consistent API usage patterns across all generated tests and examples
 
-#### **API Testing Reliability**
-- **Enhanced**: Authentication flow in comprehensive test with proper request/assertion separation
-- **Enhanced**: Performance testing with correct async execution patterns
-- **Enhanced**: Security testing with proper error handling patterns
+#### **Core Framework Integration**
+- **Fixed**: HttpClient now properly integrates with ReportingManager
+- **Fixed**: RestifiedTS main class automatically initializes reporting in test environments
+- **Fixed**: DSL layers (Given/When/Then) pass ReportingManager through execution chain
+- **Enhanced**: Error handling with complete stack trace preservation
+
+#### **Proxy and Network Configuration**
+- **MAJOR FIX**: HttpClient now properly applies proxy configuration to HTTP requests
+- **NEW**: Automatic HTTP/HTTPS/SOCKS proxy agent creation
+- **NEW**: Environment variable proxy detection (HTTP_PROXY, HTTPS_PROXY, NO_PROXY)
+- **NEW**: Proxy authentication support (username/password)
+- **NEW**: SSL/TLS configuration integration
+- **NEW**: Dynamic proxy configuration updates via updateConfig()
+- **Enhanced**: Corporate firewall and proxy compatibility
+
+### 📋 How to Enable Enhanced Reporting
+
+**For end users installing from npm registry:**
+
+Add to your Mocha command:
+```bash
+mocha -r restifiedts/dist/reporting/setup-mocha test/**/*.js --reporter mochawesome
+```
+
+Or add to package.json:
+```json
+{
+  "scripts": {
+    "test": "mocha -r restifiedts/dist/reporting/setup-mocha 'tests/**/*.ts' --reporter mochawesome --reporter-options addContext=true"
+  }
+}
+```
 
 ### 📋 Technical Details
 

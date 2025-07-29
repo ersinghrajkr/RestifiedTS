@@ -13,6 +13,8 @@ import { HttpClient } from '../clients/HttpClient';
 import { GraphQLManager, GraphQLEndpoint } from '../clients/GraphQLManager';
 import { WebSocketManager, WebSocketConnection } from '../clients/WebSocketManager';
 import { Config } from '../config/Config';
+import { ReportingManager } from '../../reporting/ReportingManager';
+import { setupMochaReporting } from '../../reporting/MochaReportingIntegration';
 
 export class RestifiedTS {
   private config: Config;
@@ -22,6 +24,7 @@ export class RestifiedTS {
   private activeClientName: string = 'default';
   private graphQLManager: GraphQLManager;
   private webSocketManager: WebSocketManager;
+  private reportingManager: ReportingManager;
 
   constructor(userConfig?: Partial<RestifiedConfig>) {
     // Initialize configuration
@@ -30,8 +33,11 @@ export class RestifiedTS {
     // Initialize variable store
     this.variableStore = new VariableStore();
     
-    // Initialize default HTTP client
-    this.httpClient = new HttpClient(this.config.getConfig());
+    // Initialize reporting manager
+    this.reportingManager = new ReportingManager();
+    
+    // Initialize default HTTP client with reporting manager
+    this.httpClient = new HttpClient(this.config.getConfig(), this.reportingManager);
     this.clients.set('default', this.httpClient);
     
     // Initialize GraphQL manager
@@ -56,6 +62,9 @@ export class RestifiedTS {
       // This would be added when someone explicitly adds a WebSocket connection
     }
     
+    // Automatically setup Mocha reporting integration if Mocha is detected
+    this.autoDetectAndSetupMochaIntegration();
+    
     // Log initialization
     if (this.config.get('logging.level') === 'debug') {
       console.log('[RestifiedTS] Framework initialized');
@@ -64,7 +73,29 @@ export class RestifiedTS {
 
   /**
    * Start a new test chain with the fluent DSL
-   * Entry point for the given().when().then() pattern
+   * 
+   * This is the entry point for RestifiedTS's fluent API following the given().when().then() pattern.
+   * The "given" step is where you configure the request (headers, auth, body, etc.)
+   * 
+   * @returns IGivenStep - The Given step for request configuration
+   * 
+   * @example
+   * ```typescript
+   * const response = await restified
+   *   .given()
+   *     .baseURL('https://api.example.com')
+   *     .bearerToken('your-token-here')
+   *     .header('Content-Type', 'application/json')
+   *     .body({ name: 'John Doe', email: 'john@example.com' })
+   *   .when()
+   *     .post('/users')
+   *     .execute();
+   * 
+   * await response
+   *   .statusCode(201)
+   *   .jsonPath('$.name', 'John Doe')
+   *   .execute();
+   * ```
    */
   given(): IGivenStep {
     return new GivenStep(
@@ -75,11 +106,51 @@ export class RestifiedTS {
   }
 
   /**
-   * Create a new HTTP client instance
+   * Create a new HTTP client instance for multi-service testing
+   * 
+   * This allows you to create named clients with different configurations for testing
+   * multiple APIs or services within the same test suite.
+   * 
+   * @param name - Unique name for the client
+   * @param config - Configuration specific to this client (baseURL, headers, timeout, etc.)
+   * @returns RestifiedTS instance for method chaining
+   * 
+   * @example
+   * ```typescript
+   * // Create clients for different services
+   * restified.createClient('authService', {
+   *   baseURL: 'https://auth.example.com',
+   *   timeout: 5000,
+   *   headers: { 'X-Service': 'auth' }
+   * });
+   * 
+   * restified.createClient('userService', {
+   *   baseURL: 'https://users.example.com',
+   *   timeout: 10000,
+   *   headers: { 'X-Service': 'users' }
+   * });
+   * 
+   * // Use different clients in tests
+   * const authResponse = await restified
+   *   .given()
+   *     .useClient('authService')
+   *     .body({ username: 'user', password: 'pass' })
+   *   .when()
+   *     .post('/login')
+   *     .execute();
+   * 
+   * const userResponse = await restified
+   *   .given()
+   *     .useClient('userService')
+   *     .bearerToken('{{token}}')
+   *   .when()
+   *     .get('/profile')
+   *     .execute();
+   * ```
    */
   createClient(name: string, config: Partial<RestifiedConfig>): RestifiedTS {
     const mergedConfig = { ...this.config.getConfig(), ...config };
-    const client = new HttpClient(mergedConfig);
+    const client = new HttpClient(mergedConfig, this.reportingManager);
     this.clients.set(name, client);
     
     if (this.config.get('logging.level') === 'debug') {
@@ -475,8 +546,174 @@ export class RestifiedTS {
   }
 
   // ==========================================
+  // REPORTING METHODS
+  // ==========================================
+
+  /**
+   * Get reporting manager instance
+   */
+  getReportingManager(): ReportingManager {
+    return this.reportingManager;
+  }
+
+  /**
+   * Start test execution tracking
+   */
+  async startExecution(name: string, description?: string): Promise<string> {
+    return await this.reportingManager.startExecution(name, description);
+  }
+
+  /**
+   * End test execution tracking
+   */
+  async endExecution() {
+    return await this.reportingManager.endExecution();
+  }
+
+  /**
+   * Start test suite tracking
+   */
+  async startSuite(name: string, description?: string): Promise<string> {
+    return await this.reportingManager.startSuite(name, description);
+  }
+
+  /**
+   * End test suite tracking
+   */
+  async endSuite() {
+    return await this.reportingManager.endSuite();
+  }
+
+  /**
+   * Start test case tracking
+   */
+  async startTest(name: string, description?: string): Promise<string> {
+    return await this.reportingManager.startTest(name, description);
+  }
+
+  /**
+   * End test case tracking
+   */
+  async endTest(status: any, error?: Error) {
+    return await this.reportingManager.endTest(status, error);
+  }
+
+  // ==========================================
   // UTILITY METHODS
   // ==========================================
+
+  /**
+   * Auto-detect and setup Mocha integration without user configuration
+   */
+  private autoDetectAndSetupMochaIntegration(): void {
+    // Check if we're in a Mocha environment
+    if (this.isMochaEnvironment()) {
+      try {
+        // Setup automatic test tracking
+        this.setupAutomaticMochaTracking();
+        
+        // Setup Mocha reporting integration
+        setupMochaReporting(this);
+        
+        if (this.config.get('logging.level') === 'debug') {
+          console.log('[RestifiedTS] Auto-detected Mocha environment, reporting enabled');
+        }
+      } catch (error) {
+        // Silently ignore if setup fails
+        if (this.config.get('logging.level') === 'debug') {
+          console.log('[RestifiedTS] Mocha integration setup failed:', (error as Error).message);
+        }
+      }
+    }
+  }
+
+  /**
+   * Setup automatic Mocha test tracking
+   */
+  private setupAutomaticMochaTracking(): void {
+    if (typeof global !== 'undefined' && (global as any).beforeEach && (global as any).it) {
+      try {
+        // Global beforeEach to track current test for automatic context attachment
+        (global as any).beforeEach(function(this: any) {
+          (global as any).currentMochaTest = this.currentTest;
+          (global as any).mochaContext = this;
+        });
+
+        // Wrap the global 'it' function to capture the actual test context
+        const originalIt = (global as any).it;
+        if (originalIt && !originalIt._restifiedWrapped) {
+          (global as any).it = function(title: string, fn?: any) {
+            if (typeof fn === 'function') {
+              const wrappedFn = function(this: any) {
+                // Set the current test context that Mochawesome can use
+                (global as any).restifiedCurrentTest = this;
+                try {
+                  const result = fn.call(this);
+                  // If it's a promise, clear the context after it resolves
+                  if (result && typeof result.then === 'function') {
+                    return result.finally(() => {
+                      (global as any).restifiedCurrentTest = null;
+                    });
+                  } else {
+                    // For synchronous tests, clear immediately
+                    (global as any).restifiedCurrentTest = null;
+                    return result;
+                  }
+                } catch (error) {
+                  (global as any).restifiedCurrentTest = null;
+                  throw error;
+                }
+              };
+              return originalIt.call(this, title, wrappedFn);
+            } else {
+              return originalIt.call(this, title, fn);
+            }
+          };
+          
+          // Copy over any properties from the original function
+          Object.setPrototypeOf((global as any).it, originalIt);
+          Object.keys(originalIt).forEach(key => {
+            if (key !== 'length' && key !== 'name') {
+              (global as any).it[key] = originalIt[key];
+            }
+          });
+          
+          // Mark as wrapped to avoid double-wrapping
+          (global as any).it._restifiedWrapped = true;
+        }
+      } catch (error) {
+        // Ignore setup errors
+        if (this.config.get('logging.level') === 'debug') {
+          console.debug('[RestifiedTS] Mocha tracking setup failed:', (error as Error).message);
+        }
+      }
+    }
+  }
+
+  /**
+   * Check if we're in a Mocha environment
+   */
+  private isMochaEnvironment(): boolean {
+    return (
+      // Check for Mocha globals
+      (typeof global !== 'undefined' && 
+       (global as any).describe && 
+       (global as any).it && 
+       (global as any).beforeEach) ||
+      // Check for test environment
+      process.env.NODE_ENV === 'test' || 
+      process.env.NODE_ENV === 'testing' ||
+      // Check if we're running via mocha command
+      process.argv.some(arg => arg.includes('mocha'))
+    );
+  }
+
+  /**
+   * Check if running in test environment (legacy method)
+   */
+  private isTestEnvironment(): boolean {
+    return this.isMochaEnvironment();
+  }
 
   /**
    * Clear all data
@@ -587,6 +824,15 @@ export class RestifiedTS {
       
       // Clear all data
       this.clearAll();
+      
+      // Close reporting manager
+      if (this.reportingManager) {
+        try {
+          await this.reportingManager.close();
+        } catch (error) {
+          console.debug('ReportingManager cleanup warning:', (error as Error).message);
+        }
+      }
       
       // Force cleanup of any remaining timers
       if (typeof global !== 'undefined' && (global as any)._restifiedTimers) {

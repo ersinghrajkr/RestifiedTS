@@ -224,7 +224,7 @@ export class WhenStep implements IWhenStep {
   }
 
   /**
-   * Transition to then step (for fluent API without execution)
+   * Transition to then step (requires prior execution)
    */
   then(): IThenStep {
     if (!this.executedResponse) {

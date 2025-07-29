@@ -10,8 +10,13 @@
  */
 
 // Load environment variables from .env file
-import * as dotenv from 'dotenv';
-dotenv.config();
+try {
+  // Try to load dotenv, but don't fail if it's not available
+  const dotenv = require('dotenv');
+  dotenv.config();
+} catch (error) {
+  // dotenv is optional, continue without it
+}
 
 // Core DSL exports
 export { RestifiedTS, restified } from './core/dsl/RestifiedTS';
@@ -92,7 +97,10 @@ export {
 // Reporting exports
 export {
   DiffReporter,
-  ReportingManager
+  ReportingManager,
+  MochaReportingIntegration,
+  setupMochaReporting,
+  getMochaIntegration
 } from './reporting';
 
 // Type exports

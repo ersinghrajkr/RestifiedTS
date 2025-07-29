@@ -15,12 +15,17 @@ export class DiffReporter {
    */
   async generateDiffReport(snapshots: Map<string, any>): Promise<string> {
     const template = this.getDiffTemplate();
-    const diffs = this.generateDiffSections(snapshots);
+    if (!template || typeof template !== 'string') {
+      throw new Error('Invalid template returned from getDiffTemplate');
+    }
+    
+    const diffs = String(this.generateDiffSections(snapshots) || '');
+    const snapshotData = String(JSON.stringify(Array.from(snapshots.entries()), null, 2) || '[]');
     
     const html = template
       .replace('{{TITLE}}', 'RestifiedTS Snapshot Diff Report')
       .replace('{{DIFF_SECTIONS}}', diffs)
-      .replace('{{SNAPSHOT_DATA}}', JSON.stringify(Array.from(snapshots.entries()), null, 2));
+      .replace('{{SNAPSHOT_DATA}}', snapshotData);
 
     return html;
   }
@@ -34,16 +39,28 @@ export class DiffReporter {
     testName: string
   ): Promise<string> {
     const template = this.getResponseDiffTemplate();
+    if (!template || typeof template !== 'string') {
+      throw new Error('Invalid template returned from getResponseDiffTemplate');
+    }
+    
     const diffAnalysis = this.analyzeResponseDiff(expected, actual);
     
+    // Safely generate content with null checks
+    const safeTestName = String(testName || 'Untitled');
+    const safeDiffAnalysis = String(this.generateDiffAnalysisSection(diffAnalysis) || '');
+    const safeSideBySide = String(this.generateSideBySideDiff(expected, actual) || '');
+    const safeUnified = String(this.generateUnifiedDiff(expected, actual) || '');
+    const safeExpected = String(JSON.stringify(expected, null, 2) || 'null');
+    const safeActual = String(JSON.stringify(actual, null, 2) || 'null');
+    
     const html = template
-      .replace('{{TITLE}}', `Response Diff Report - ${testName}`)
-      .replace('{{TEST_NAME}}', testName)
-      .replace('{{DIFF_ANALYSIS}}', this.generateDiffAnalysisSection(diffAnalysis))
-      .replace('{{SIDE_BY_SIDE_DIFF}}', this.generateSideBySideDiff(expected, actual))
-      .replace('{{UNIFIED_DIFF}}', this.generateUnifiedDiff(expected, actual))
-      .replace('{{EXPECTED_DATA}}', JSON.stringify(expected, null, 2))
-      .replace('{{ACTUAL_DATA}}', JSON.stringify(actual, null, 2));
+      .replace('{{TITLE}}', `Response Diff Report - ${safeTestName}`)
+      .replace('{{TEST_NAME}}', safeTestName)
+      .replace('{{DIFF_ANALYSIS}}', safeDiffAnalysis)
+      .replace('{{SIDE_BY_SIDE_DIFF}}', safeSideBySide)
+      .replace('{{UNIFIED_DIFF}}', safeUnified)
+      .replace('{{EXPECTED_DATA}}', safeExpected)
+      .replace('{{ACTUAL_DATA}}', safeActual);
 
     return html;
   }
@@ -60,14 +77,19 @@ export class DiffReporter {
     }>
   ): Promise<string> {
     const template = this.getBatchDiffTemplate();
-    const batchSummary = this.generateBatchSummary(comparisons);
-    const batchSections = this.generateBatchSections(comparisons);
+    if (!template || typeof template !== 'string') {
+      throw new Error('Invalid template returned from getBatchDiffTemplate');
+    }
+    
+    const safeBatchSummary = String(this.generateBatchSummary(comparisons) || '');
+    const safeBatchSections = String(this.generateBatchSections(comparisons) || '');
+    const safeComparisonsData = String(JSON.stringify(comparisons, null, 2) || '[]');
     
     const html = template
       .replace('{{TITLE}}', 'RestifiedTS Batch Diff Report')
-      .replace('{{BATCH_SUMMARY}}', batchSummary)
-      .replace('{{BATCH_SECTIONS}}', batchSections)
-      .replace('{{COMPARISONS_DATA}}', JSON.stringify(comparisons, null, 2));
+      .replace('{{BATCH_SUMMARY}}', safeBatchSummary)
+      .replace('{{BATCH_SECTIONS}}', safeBatchSections)
+      .replace('{{COMPARISONS_DATA}}', safeComparisonsData);
 
     return html;
   }
