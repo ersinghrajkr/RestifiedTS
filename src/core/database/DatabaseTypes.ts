@@ -111,6 +111,7 @@ export interface DatabaseError extends Error {
   sqlMessage?: string;
   query?: string;
   parameters?: any[];
+  cause?: Error;
 }
 
 // MongoDB specific types

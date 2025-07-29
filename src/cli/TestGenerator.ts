@@ -40,7 +40,7 @@ export class TestGenerator {
 
   private initializeTemplates(): void {
     this.templates.set('api', `import { expect } from 'chai';
-import { restified } from '../src';
+import { restified } from 'restifiedts';
 
 describe('{{className}} API Tests @integration @{{name}}', () => {
   let authToken: string;
@@ -455,7 +455,7 @@ describe('{{className}} API Tests @integration @{{name}}', () => {
 });`);
 
     this.templates.set('graphql', `import { expect } from 'chai';
-import { restified } from '../src';
+import { restified } from 'restifiedts';
 
 describe('{{className}} GraphQL Tests @integration @graphql @{{name}}', () => {
   
@@ -697,7 +697,7 @@ describe('{{className}} GraphQL Tests @integration @graphql @{{name}}', () => {
 });`);
 
     this.templates.set('websocket', `import { expect } from 'chai';
-import { restified } from '../src';
+import { restified } from 'restifiedts';
 
 describe('{{className}} WebSocket Tests @integration @websocket @{{name}}', () => {
   
@@ -947,7 +947,7 @@ describe('{{className}} WebSocket Tests @integration @websocket @{{name}}', () =
 });`);
 
     this.templates.set('setup', `import { expect } from 'chai';
-import { restified } from '../src';
+import { restified } from 'restifiedts';
 
 /**
  * {{className}} Test Setup and Teardown

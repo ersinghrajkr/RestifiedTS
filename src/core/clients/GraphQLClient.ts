@@ -69,6 +69,7 @@ export class GraphQLClient {
       headers: {},
       introspection: false,
       defaultVariables: {},
+      httpClient: undefined,
       ...config,
       endpoint: config.endpoint || '/graphql'
     };
@@ -541,6 +542,13 @@ export class GraphQLQueryBuilder {
     this.variableDefinitions[name] = type;
     this.variables[name] = value;
     return this;
+  }
+
+  /**
+   * Add a context variable (alias for variable method)
+   */
+  contextVariable(name: string, type: string, value: any): GraphQLQueryBuilder {
+    return this.variable(name, type, value);
   }
 
   /**

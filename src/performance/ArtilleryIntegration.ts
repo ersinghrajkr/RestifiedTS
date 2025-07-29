@@ -150,7 +150,7 @@ export class ArtilleryIntegration extends EventEmitter {
   private activeTests: Map<string, LoadTestResult> = new Map();
   private tempDir: string;
 
-  constructor(tempDir: string = './temp/artillery') {
+  constructor(tempDir: string = './output/temp/artillery') {
     super();
     this.tempDir = tempDir;
     this.ensureTempDir();

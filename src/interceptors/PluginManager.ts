@@ -34,14 +34,30 @@ export class PluginManager extends EventEmitter {
   private services: PluginServices;
 
   constructor(
-    interceptorManager: InterceptorManager,
-    services: PluginServices,
+    interceptorManager?: InterceptorManager,
+    services?: PluginServices,
     config: Partial<PluginManagerConfig> = {}
   ) {
     super();
     
-    this.interceptorManager = interceptorManager;
-    this.services = services;
+    // Provide defaults for testing
+    this.interceptorManager = interceptorManager || new InterceptorManager();
+    this.services = services || {
+      logger: {
+        debug: () => {},
+        info: () => {},
+        warn: () => {},
+        error: () => {}
+      },
+      httpClient: null as any,
+      variableStore: null as any,
+      responseStore: null as any,
+      assertionManager: null as any,
+      config: null as any,
+      registerInterceptor: (interceptor: any) => {
+        this.interceptorManager.registerInterceptor(interceptor);
+      }
+    };
     this.config = {
       autoLoadPlugins: true,
       pluginTimeout: 30000,
@@ -60,21 +76,30 @@ export class PluginManager extends EventEmitter {
    * Register a plugin
    */
   async registerPlugin(plugin: RestifiedPlugin): Promise<void> {
-    this.emit('plugin:loading', plugin.name);
+    // Provide defaults for optional properties
+    const pluginWithDefaults: RestifiedPlugin = {
+      description: '',
+      enabled: true,
+      priority: this.config.defaultPriority,
+      ...plugin
+    };
+
+    this.emit('plugin:loading', pluginWithDefaults.name);
 
     try {
+
       // Validate plugin
-      await this.validatePlugin(plugin);
+      await this.validatePlugin(pluginWithDefaults);
 
       // Check dependencies
-      await this.checkDependencies(plugin);
+      await this.checkDependencies(pluginWithDefaults);
 
       // Create plugin context
-      const context = this.createPluginContext(plugin);
+      const context = this.createPluginContext(pluginWithDefaults);
 
       // Create registry entry
       const entry: PluginRegistryEntry = {
-        plugin,
+        plugin: pluginWithDefaults,
         context,
         status: PluginStatus.LOADING,
         loadTime: new Date(),
@@ -87,29 +112,29 @@ export class PluginManager extends EventEmitter {
         }
       };
 
-      this.plugins.set(plugin.name, entry);
+      this.plugins.set(pluginWithDefaults.name, entry);
 
       // Initialize plugin
-      if (plugin.initialize) {
+      if (pluginWithDefaults.initialize) {
         await this.executeWithTimeout(
-          () => plugin.initialize!(context),
+          () => pluginWithDefaults.initialize!(context),
           this.config.pluginTimeout,
-          `Plugin ${plugin.name} initialization timeout`
+          `Plugin ${pluginWithDefaults.name} initialization timeout`
         );
       }
 
       // Configure plugin
-      if (plugin.configure && plugin.config) {
+      if (pluginWithDefaults.configure && (pluginWithDefaults as any).config) {
         await this.executeWithTimeout(
-          () => plugin.configure!(plugin.config),
+          () => pluginWithDefaults.configure!((pluginWithDefaults as any).config),
           this.config.pluginTimeout,
-          `Plugin ${plugin.name} configuration timeout`
+          `Plugin ${pluginWithDefaults.name} configuration timeout`
         );
       }
 
       // Register plugin interceptors
-      if (plugin.interceptors) {
-        for (const interceptor of plugin.interceptors) {
+      if ((pluginWithDefaults as any).interceptors) {
+        for (const interceptor of (pluginWithDefaults as any).interceptors) {
           this.interceptorManager.registerInterceptor(interceptor);
         }
       }
@@ -118,19 +143,19 @@ export class PluginManager extends EventEmitter {
       entry.status = PluginStatus.LOADED;
 
       // Activate plugin if enabled
-      if (plugin.enabled) {
-        await this.activatePlugin(plugin.name);
+      if (pluginWithDefaults.enabled) {
+        await this.activatePlugin(pluginWithDefaults.name);
       }
 
-      this.emit('plugin:loaded', plugin);
+      this.emit('plugin:loaded', pluginWithDefaults);
 
     } catch (error) {
-      const entry = this.plugins.get(plugin.name);
+      const entry = this.plugins.get(pluginWithDefaults.name);
       if (entry) {
         entry.status = PluginStatus.ERROR;
       }
       
-      this.emit('plugin:error', plugin.name, error);
+      this.emit('plugin:error', pluginWithDefaults.name, error);
       throw error;
     }
   }
@@ -155,6 +180,15 @@ export class PluginManager extends EventEmitter {
         for (const interceptor of entry.plugin.interceptors) {
           this.interceptorManager.unregisterInterceptor(interceptor.name);
         }
+      }
+
+      // Cleanup plugin
+      if ('cleanup' in entry.plugin && entry.plugin.cleanup) {
+        await this.executeWithTimeout(
+          () => entry.plugin.cleanup!(),
+          this.config.pluginTimeout,
+          `Plugin ${name} cleanup timeout`
+        );
       }
 
       // Destroy plugin
@@ -277,6 +311,20 @@ export class PluginManager extends EventEmitter {
    */
   getAllPlugins(): RestifiedPlugin[] {
     return Array.from(this.plugins.values()).map(entry => entry.plugin);
+  }
+
+  /**
+   * Get loaded plugins (alias for getAllPlugins)
+   */
+  getLoadedPlugins(): RestifiedPlugin[] {
+    return this.getAllPlugins();
+  }
+
+  /**
+   * Unload plugin (alias for unregisterPlugin)
+   */
+  async unloadPlugin(name: string): Promise<boolean> {
+    return await this.unregisterPlugin(name);
   }
 
   /**
@@ -582,17 +630,31 @@ export class PluginManager extends EventEmitter {
   /**
    * Load plugin from path
    */
-  async loadPlugin(pluginPath: string): Promise<void> {
-    if (!this.pluginLoader) {
-      throw new Error('Plugin loader not configured');
-    }
+  async loadPlugin(pluginPath: string): Promise<void>;
+  /**
+   * Load plugin from object
+   */
+  async loadPlugin(plugin: RestifiedPlugin): Promise<void>;
+  /**
+   * Load plugin implementation
+   */
+  async loadPlugin(pluginOrPath: string | RestifiedPlugin): Promise<void> {
+    if (typeof pluginOrPath === 'string') {
+      // Load from path
+      if (!this.pluginLoader) {
+        throw new Error('Plugin loader not configured');
+      }
 
-    if (!this.config.allowDynamicLoading) {
-      throw new Error('Dynamic plugin loading is disabled');
-    }
+      if (!this.config.allowDynamicLoading) {
+        throw new Error('Dynamic plugin loading is disabled');
+      }
 
-    const plugin = await this.pluginLoader.load(pluginPath);
-    await this.registerPlugin(plugin);
+      const plugin = await this.pluginLoader.load(pluginOrPath);
+      await this.registerPlugin(plugin);
+    } else {
+      // Load from plugin object
+      await this.registerPlugin(pluginOrPath);
+    }
   }
 
   /**
@@ -692,14 +754,31 @@ export class PluginManager extends EventEmitter {
     timeout: number,
     timeoutMessage: string
   ): Promise<T> {
+    let timeoutHandle: NodeJS.Timeout | null = null;
+    
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error(timeoutMessage)), timeout);
+      timeoutHandle = setTimeout(() => reject(new Error(timeoutMessage)), timeout);
     });
 
-    return Promise.race([
-      Promise.resolve(fn()),
-      timeoutPromise
-    ]);
+    try {
+      const result = await Promise.race([
+        Promise.resolve(fn()),
+        timeoutPromise
+      ]);
+      
+      // Clear timeout if we got a result
+      if (timeoutHandle) {
+        clearTimeout(timeoutHandle);
+      }
+      
+      return result;
+    } catch (error) {
+      // Clear timeout on error too
+      if (timeoutHandle) {
+        clearTimeout(timeoutHandle);
+      }
+      throw error;
+    }
   }
 
   /**

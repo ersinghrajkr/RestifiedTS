@@ -104,6 +104,13 @@ export class InterceptorManager extends EventEmitter {
   }
 
   /**
+   * List all interceptors (alias for getAllInterceptors)
+   */
+  listInterceptors(): Interceptor[] {
+    return this.getAllInterceptors();
+  }
+
+  /**
    * Get interceptors by phase
    */
   getInterceptorsByPhase(phase: InterceptorPhase): Interceptor[] {
@@ -363,15 +370,23 @@ export class InterceptorManager extends EventEmitter {
         this.emit('interceptor:error', error, interceptor);
 
         // Handle error based on configuration
+        let errorRecovered = false;
         if ('onError' in interceptor && interceptor.onError) {
           try {
-            await interceptor.onError(error, context);
+            const recoveryResult = await interceptor.onError(error, context);
+            if (recoveryResult !== undefined) {
+              currentData = recoveryResult;
+              errorRecovered = true;
+              result.success = true;
+              result.modified = true;
+              this.emit('interceptor:recovered', result);
+            }
           } catch (errorHandlerError) {
             errors.push(errorHandlerError);
           }
         }
 
-        if (!chainConfig.skipOnError) {
+        if (!errorRecovered && !chainConfig.skipOnError) {
           results.push(result);
           break;
         }
@@ -473,12 +488,33 @@ export class InterceptorManager extends EventEmitter {
       return this.statistics.get(interceptorName);
     }
     
-    const allStats: Record<string, any> = {};
-    this.statistics.forEach((stats, name) => {
-      allStats[name] = { ...stats };
+    // System-level statistics
+    const allInterceptors = Array.from(this.interceptors.values());
+    
+    const enabledInterceptors = allInterceptors.filter((i: Interceptor) => i.enabled);
+    const disabledInterceptors = allInterceptors.filter((i: Interceptor) => !i.enabled);
+    
+    const byPhase: Record<string, number> = {};
+    const byPriority: Record<string, number> = {};
+    
+    allInterceptors.forEach((interceptor: Interceptor) => {
+      byPhase[interceptor.phase] = (byPhase[interceptor.phase] || 0) + 1;
+      byPriority[interceptor.priority] = (byPriority[interceptor.priority] || 0) + 1;
     });
     
-    return allStats;
+    const executionStats: Record<string, any> = {};
+    this.statistics.forEach((stats, name) => {
+      executionStats[name] = { ...stats };
+    });
+    
+    return {
+      totalInterceptors: allInterceptors.length,
+      enabledInterceptors: enabledInterceptors.length,
+      disabledInterceptors: disabledInterceptors.length,
+      byPhase,
+      byPriority,
+      executionStats
+    };
   }
 
   /**

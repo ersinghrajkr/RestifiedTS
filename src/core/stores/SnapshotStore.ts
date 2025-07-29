@@ -25,7 +25,7 @@ export class SnapshotStore {
     ignoreFields?: string[];
     autoLoad?: boolean;
   } = {}) {
-    this.snapshotDir = options.snapshotDir || './snapshots';
+    this.snapshotDir = options.snapshotDir || './output/snapshots';
     this.updateMode = options.updateMode || false;
     this.ignoreFields = options.ignoreFields || [];
 
@@ -333,7 +333,12 @@ export class SnapshotStore {
    * Calculate checksum for data
    */
   private calculateChecksum(data: any): string {
-    const serialized = JSON.stringify(data, Object.keys(data).sort());
+    if (data === null || data === undefined) {
+      data = { __null: true };
+    }
+    
+    const keys = typeof data === 'object' && data !== null ? Object.keys(data).sort() : null;
+    const serialized = JSON.stringify(data, keys);
     return createHash('sha256').update(serialized).digest('hex');
   }
 

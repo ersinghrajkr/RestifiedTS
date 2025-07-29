@@ -12,6 +12,14 @@
 // Specialized reporters (HtmlReporter temporarily commented out due to type issues)
 // export { HtmlReporter } from './HtmlReporter';
 export { DiffReporter } from './DiffReporter';
+export { ReportingManager } from './ReportingManager';
+
+// Mocha integration for automatic reporting
+export { 
+  MochaReportingIntegration,
+  setupMochaReporting,
+  getMochaIntegration
+} from './MochaReportingIntegration';
 
 // Re-export reporting types for convenience
 export type {

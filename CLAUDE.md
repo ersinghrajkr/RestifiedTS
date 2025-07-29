@@ -104,10 +104,13 @@ Uses TypeScript decorators for test organization:
 ## TypeScript Configuration
 
 The project uses strict TypeScript settings with:
+- **Production build** (`tsconfig.json`): Compiles only `src/` for library distribution
+- **Test environment** (`tsconfig.test.json`): Includes both `src/` and `tests/` for test compilation
 - Path mapping for clean imports (`@core/*`, `@utils/*`, etc.)
 - Experimental decorators enabled for test tagging
 - Target ES2020 with CommonJS modules
 - Declaration files generated for library usage
+- Separate rootDir for production (`./src`) and test (`./`) environments
 
 ## File Organization Guidelines
 

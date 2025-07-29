@@ -419,6 +419,49 @@ export class ReportingManager extends EventEmitter {
 
       this.logger.info(responseEntry.message, responseEntry.metadata);
     }
+
+    // Attach request/response details to Mocha test reports
+    await this.attachToMochaReport(request, response);
+  }
+
+  /**
+   * Attach request/response data to Mocha test reports
+   */
+  private async attachToMochaReport(request: any, response?: RestifiedResponse): Promise<void> {
+    try {
+      // Import getMochaIntegration dynamically to avoid circular dependencies
+      const { getMochaIntegration } = await import('./MochaReportingIntegration');
+      const mochaIntegration = getMochaIntegration();
+      
+      if (mochaIntegration && mochaIntegration.isActive()) {
+        await mochaIntegration.attachRequestResponse(request, response);
+      }
+    } catch (error) {
+      // Silently ignore if Mocha integration is not available
+      if (process.env.NODE_ENV === 'development') {
+        console.debug('Failed to attach request/response to Mocha report:', (error as Error).message);
+      }
+    }
+  }
+
+  /**
+   * Attach error details to Mocha test reports
+   */
+  async attachErrorToReport(error: Error, context?: any): Promise<void> {
+    try {
+      // Import getMochaIntegration dynamically to avoid circular dependencies
+      const { getMochaIntegration } = await import('./MochaReportingIntegration');
+      const mochaIntegration = getMochaIntegration();
+      
+      if (mochaIntegration && mochaIntegration.isActive()) {
+        await mochaIntegration.attachError(error, context);
+      }
+    } catch (attachError) {
+      // Silently ignore if Mocha integration is not available
+      if (process.env.NODE_ENV === 'development') {
+        console.debug('Failed to attach error to Mocha report:', (attachError as Error).message);
+      }
+    }
   }
 
   /**

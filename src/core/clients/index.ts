@@ -10,6 +10,7 @@ export { GraphQLClient, GraphQLQueryBuilder } from './GraphQLClient';
 export { GraphQLManager } from './GraphQLManager';
 export { WebSocketClient } from './WebSocketClient';
 export { WebSocketManager } from './WebSocketManager';
+export { ClientManager } from './ClientManager';
 
 // Re-export types for convenience
 export type {

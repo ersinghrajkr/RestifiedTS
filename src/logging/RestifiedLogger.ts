@@ -6,14 +6,14 @@
  */
 
 import { EventEmitter } from 'events';
-import { 
-  Logger, 
-  LogEntry, 
-  LogLevel, 
-  LogTransport, 
-  LogFormatter, 
-  LoggerConfig, 
-  LogTimer, 
+import {
+  Logger,
+  LogEntry,
+  LogLevel,
+  LogTransport,
+  LogFormatter,
+  LoggerConfig,
+  LogTimer,
   LogContext,
   LogFilter,
   LogMiddleware,
@@ -41,7 +41,7 @@ class RestifiedLogTimer implements LogTimer {
   end(message?: string, level: LogLevel = LogLevel.INFO): void {
     const duration = this.getDuration();
     const logMessage = message || `Timer '${this.name}' completed`;
-    
+
     this.logger.log(level, logMessage, {
       timer: this.name,
       duration,
@@ -70,10 +70,13 @@ export class RestifiedLogger extends EventEmitter implements Logger {
   private samplingConfig?: LogSamplingConfig;
   private bufferConfig?: LogBufferConfig;
   private isShuttingDown = false;
+  private static sigintHandler?: () => void;
+  private static sigtermHandler?: () => void;
+  private static sigquitHandler?: () => void;
 
   constructor(config: Partial<LoggerConfig> = {}) {
     super();
-    
+
     this.config = {
       level: LogLevel.INFO,
       context: '',
@@ -479,7 +482,7 @@ export class RestifiedLogger extends EventEmitter implements Logger {
     // Check if buffer should be flushed
     if (this.bufferConfig) {
       const shouldFlush = this.buffer.length >= this.bufferConfig.size ||
-                         (this.bufferConfig.flushOnLevel && entry.level >= this.bufferConfig.flushOnLevel);
+        (this.bufferConfig.flushOnLevel && entry.level >= this.bufferConfig.flushOnLevel);
 
       if (shouldFlush) {
         this.flushBuffer();
@@ -561,34 +564,34 @@ export class RestifiedLogger extends EventEmitter implements Logger {
    */
   private formatForConsole(entry: LogEntry): string {
     const { colorize, timestamp, prettyPrint } = this.config.consoleOptions;
-    
+
     let formatted = '';
-    
+
     if (timestamp) {
       formatted += `[${entry.timestamp.toISOString()}] `;
     }
-    
+
     const levelStr = LogLevel[entry.level].padEnd(5);
     if (colorize) {
       formatted += this.colorizeLevel(levelStr, entry.level);
     } else {
       formatted += levelStr;
     }
-    
+
     if (entry.context) {
       formatted += ` [${entry.context}]`;
     }
-    
+
     formatted += `: ${entry.message}`;
-    
+
     if (prettyPrint && entry.metadata && Object.keys(entry.metadata).length > 0) {
       formatted += `\n${JSON.stringify(entry.metadata, null, 2)}`;
     }
-    
+
     if (entry.error && entry.stack) {
       formatted += `\n${entry.stack}`;
     }
-    
+
     return formatted;
   }
 
@@ -604,7 +607,7 @@ export class RestifiedLogger extends EventEmitter implements Logger {
       [LogLevel.ERROR]: '\x1b[31m', // Red
       [LogLevel.FATAL]: '\x1b[35m'  // Magenta
     };
-    
+
     const reset = '\x1b[0m';
     return `${colors[logLevel]}${level}${reset}`;
   }
@@ -624,25 +627,135 @@ export class RestifiedLogger extends EventEmitter implements Logger {
     }
   }
 
+  // Static flag to ensure shutdown handlers are only registered once
+  private static shutdownHandlersRegistered = false;
+  private static loggerInstances: Set<RestifiedLogger> = new Set();
+
   /**
-   * Setup shutdown handlers
+   * Setup shutdown handlers (singleton pattern)
    */
   private setupShutdownHandlers(): void {
-    const shutdown = async (signal: string) => {
-      console.log(`Received ${signal}, shutting down logger...`);
-      
-      if (this.bufferConfig?.flushOnShutdown) {
-        await this.flush();
-      }
-      
-      await this.close();
-      process.exit(0);
-    };
+    RestifiedLogger.loggerInstances.add(this);
 
-    process.on('SIGINT', () => shutdown('SIGINT'));
-    process.on('SIGTERM', () => shutdown('SIGTERM'));
-    process.on('SIGQUIT', () => shutdown('SIGQUIT'));
+    if (!RestifiedLogger.shutdownHandlersRegistered) {
+      RestifiedLogger.shutdownHandlersRegistered = true;
+
+      const shutdown = async (signal: string) => {
+        console.log(`Received ${signal}, shutting down ${RestifiedLogger.loggerInstances.size} logger instance(s)...`);
+        
+        // Quick shutdown to prevent hanging
+        const shutdownPromises = Array.from(RestifiedLogger.loggerInstances).map(logger => {
+          return Promise.race([
+            (async () => {
+              try {
+                if (logger.bufferConfig?.flushOnShutdown) {
+                  await logger.flush();
+                }
+                await logger.close();
+              } catch (error) { 
+                // Ignore errors during shutdown
+              }
+            })(),
+            // Timeout after 1 second
+            new Promise<void>(resolve => setTimeout(resolve, 1000))
+          ]);
+        });
+        
+        await Promise.all(shutdownPromises);
+        RestifiedLogger.loggerInstances.clear();
+        
+        // Force exit if needed
+        setTimeout(() => {
+          process.exit(0);
+        }, 500);
+      };
+
+      RestifiedLogger.sigintHandler = () => {
+        shutdown('SIGINT').catch(() => process.exit(0));
+      };
+      RestifiedLogger.sigtermHandler = () => {
+        shutdown('SIGTERM').catch(() => process.exit(0));
+      };
+      RestifiedLogger.sigquitHandler = () => {
+        shutdown('SIGQUIT').catch(() => process.exit(0));
+      };
+
+      process.on('SIGINT', RestifiedLogger.sigintHandler);
+      process.on('SIGTERM', RestifiedLogger.sigtermHandler);
+      process.on('SIGQUIT', RestifiedLogger.sigquitHandler);
+    }
   }
+
+
+  // private setupShutdownHandlers(): void {
+  //   // Add this instance to the global set
+  //   RestifiedLogger.loggerInstances.add(this);
+
+  //   // Only register global handlers once
+  //   if (!RestifiedLogger.shutdownHandlersRegistered) {
+  //     RestifiedLogger.shutdownHandlersRegistered = true;
+
+  //     const shutdown = async (signal: string) => {
+  //       console.log(`Received ${signal}, shutting down ${RestifiedLogger.loggerInstances.size} logger instance(s)...`);
+
+  //       // Shutdown all logger instances
+  //       const shutdownPromises = Array.from(RestifiedLogger.loggerInstances).map(async logger => {
+  //         try {
+  //           if (logger.bufferConfig?.flushOnShutdown) {
+  //             await logger.flush();
+  //           }
+  //           await logger.close();
+  //         } catch (error) {
+  //           // Ignore errors during shutdown
+  //         }
+  //       });
+
+  //       await Promise.all(shutdownPromises);
+  //       RestifiedLogger.loggerInstances.clear();
+  //     };
+
+  //     process.on('SIGINT', () => shutdown('SIGINT'));
+  //     process.on('SIGTERM', () => shutdown('SIGTERM'));
+  //     process.on('SIGQUIT', () => shutdown('SIGQUIT'));
+  //   }
+  // }
+
+  /**
+   * Destroy the logger and clean up resources
+   */
+  destroy(): void {
+    RestifiedLogger.loggerInstances.delete(this);
+
+    if (this.bufferTimer) {
+      clearInterval(this.bufferTimer);
+      this.bufferTimer = undefined;
+    }
+
+    this.close().catch(() => { });
+
+    // If this was the last logger, remove global handlers
+    if (RestifiedLogger.loggerInstances.size === 0 && RestifiedLogger.shutdownHandlersRegistered) {
+      if (RestifiedLogger.sigintHandler) process.off('SIGINT', RestifiedLogger.sigintHandler);
+      if (RestifiedLogger.sigtermHandler) process.off('SIGTERM', RestifiedLogger.sigtermHandler);
+      if (RestifiedLogger.sigquitHandler) process.off('SIGQUIT', RestifiedLogger.sigquitHandler);
+      RestifiedLogger.shutdownHandlersRegistered = false;
+    }
+  }
+  // destroy(): void {
+  //   // Remove from global instances
+  //   RestifiedLogger.loggerInstances.delete(this);
+
+  //   // Clear timer if exists
+  //   if (this.bufferTimer) {
+  //     clearInterval(this.bufferTimer);
+  //     this.bufferTimer = undefined;
+  //   }
+
+  //   // Close streams
+  //   this.close().catch(() => {
+  //     // Ignore close errors during cleanup
+  //   });
+  // }
 }
 
 export default RestifiedLogger;

@@ -54,10 +54,23 @@ export class InterceptorPluginSystem extends EventEmitter {
   private services: PluginServices;
   private initialized = false;
 
-  constructor(services: PluginServices, config: Partial<SystemConfig> = {}) {
+  constructor(services?: PluginServices, config: Partial<SystemConfig> = {}) {
     super();
     
-    this.services = services;
+    // Provide default services if none provided (for testing)
+    this.services = services || {
+      logger: {
+        debug: () => {},
+        info: () => {},
+        warn: () => {},
+        error: () => {}
+      },
+      httpClient: null as any,
+      variableStore: null as any,
+      responseStore: null as any,
+      assertionManager: null as any,
+      config: null as any
+    };
     this.config = {
       interceptors: {
         enabled: true,
@@ -456,6 +469,27 @@ export class InterceptorPluginSystem extends EventEmitter {
     this.pluginManager.on('plugin:error', (name, error) => {
       this.emit('system:error', error);
     });
+  }
+
+  /**
+   * Get interceptors (alias for getAllInterceptors)
+   */
+  getInterceptors(): Interceptor[] {
+    return this.interceptorManager.getAllInterceptors();
+  }
+
+  /**
+   * Get plugins (alias for getAllPlugins)
+   */
+  getPlugins(): RestifiedPlugin[] {
+    return this.pluginManager.getAllPlugins();
+  }
+
+  /**
+   * Load plugin (delegates to plugin manager)
+   */
+  async loadPlugin(plugin: RestifiedPlugin): Promise<void> {
+    return await this.pluginManager.loadPlugin(plugin);
   }
 
   /**

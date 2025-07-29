@@ -25,6 +25,23 @@ describe('Interceptor and Plugin System Tests @unit @integration', () => {
     pluginSystem = new InterceptorPluginSystem();
   });
 
+  afterEach(async () => {
+    // Clean up all manager instances to prevent resource leaks
+    try {
+      if (pluginSystem) {
+        await pluginSystem.destroy();
+      }
+      if (pluginManager) {
+        await pluginManager.destroy();
+      }
+      if (interceptorManager) {
+        interceptorManager.reset();
+      }
+    } catch (error) {
+      // Ignore cleanup errors
+    }
+  });
+
   describe('InterceptorManager', () => {
     it('should initialize interceptor manager without errors', () => {
       expect(interceptorManager).to.be.instanceOf(InterceptorManager);
@@ -176,7 +193,9 @@ describe('Interceptor and Plugin System Tests @unit @integration', () => {
       expect(loadedPlugins.some(p => p.name === 'plugin2')).to.be.true;
     });
 
-    it('should handle plugin initialization errors', () => {
+    it('should handle plugin initialization errors', async function() {
+      this.timeout(5000);
+      
       const faultyPlugin = {
         name: 'faultyPlugin',
         version: '1.0.0',
@@ -185,12 +204,22 @@ describe('Interceptor and Plugin System Tests @unit @integration', () => {
         }
       };
 
-      expect(() => {
-        pluginManager.loadPlugin(faultyPlugin);
-      }).to.not.throw(); // Should handle errors gracefully
+      // The loadPlugin method should reject when initialization fails
+      try {
+        await pluginManager.loadPlugin(faultyPlugin);
+        expect.fail('Expected loadPlugin to throw an error');
+      } catch (error) {
+        expect(error).to.be.an('error');
+        expect((error as Error).message).to.include('Initialization failed');
+      }
       
-      // Plugin should still be loaded even if initialization fails
-      expect(pluginManager.getLoadedPlugins()).to.have.length(1);
+      // Plugin should be registered but in error status
+      const loadedPlugins = pluginManager.getLoadedPlugins();
+      expect(loadedPlugins).to.have.length(1);
+      
+      // Check the plugin status using getPluginStatus method
+      const pluginStatus = pluginManager.getPluginStatus('faultyPlugin');
+      expect(pluginStatus).to.equal('error');
     });
   });
 
@@ -199,19 +228,34 @@ describe('Interceptor and Plugin System Tests @unit @integration', () => {
       expect(pluginSystem).to.be.instanceOf(InterceptorPluginSystem);
     });
 
-    it('should integrate interceptors and plugins', () => {
+    it('should integrate interceptors and plugins', async function() {
+      this.timeout(5000);
+      
+      const customInterceptor = new UserAgentInterceptor('Plugin/1.0');
       const mockPlugin = {
         name: 'integratedPlugin',
         version: '1.0.0',
-        initialize: (system: any) => {
-          const customInterceptor = new UserAgentInterceptor('Plugin/1.0');
-          system.registerInterceptor(customInterceptor);
+        interceptors: [customInterceptor],
+        initialize: () => {
+          // Plugin initialization logic (no interceptor registration here)
         }
       };
 
-      expect(() => {
-        pluginSystem.loadPlugin(mockPlugin);
-      }).to.not.throw();
+      try {
+        await pluginSystem.loadPlugin(mockPlugin);
+        
+        // Verify the plugin was loaded
+        const plugins = pluginSystem.getPlugins();
+        expect(plugins).to.have.length(1);
+        expect(plugins[0].name).to.equal('integratedPlugin');
+        
+        // Verify the interceptor was registered
+        const interceptors = pluginSystem.getInterceptors();
+        expect(interceptors.some(i => i.name === 'userAgent')).to.be.true;
+      } catch (error) {
+        console.error('Plugin loading failed:', error);
+        throw error;
+      }
     });
 
     it('should manage both interceptors and plugins', () => {
@@ -354,12 +398,18 @@ describe('Interceptor and Plugin System Tests @unit @integration', () => {
       }).to.throw();
     });
 
-    it('should handle plugin loading errors gracefully', () => {
+    it('should handle plugin loading errors gracefully', async function() {
+      this.timeout(5000);
+      
       const invalidPlugin = {} as any; // Invalid plugin
       
-      expect(() => {
-        pluginManager.loadPlugin(invalidPlugin);
-      }).to.not.throw(); // Should handle gracefully
+      try {
+        await pluginManager.loadPlugin(invalidPlugin);
+        expect.fail('Expected loadPlugin to throw an error for invalid plugin');
+      } catch (error) {
+        expect(error).to.be.an('error');
+        expect((error as Error).message).to.include('Plugin must have a valid name');
+      }
     });
 
     it('should handle unregistering non-existent interceptors', () => {

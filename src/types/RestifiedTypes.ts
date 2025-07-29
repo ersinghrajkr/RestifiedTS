@@ -175,23 +175,219 @@ export interface RestifiedError extends Error {
 // DSL STEP INTERFACES
 // ==========================================
 
+/**
+ * Given Step Interface - Request Configuration
+ * 
+ * The Given step allows you to configure the request before execution.
+ * This includes setting headers, authentication, request body, parameters, and more.
+ * 
+ * @example
+ * ```typescript
+ * const response = await restified
+ *   .given()
+ *     .baseURL('https://api.example.com')
+ *     .bearerToken('your-token-here')
+ *     .header('Content-Type', 'application/json')
+ *     .body({ name: 'John Doe', email: 'john@example.com' })
+ *   .when()
+ *     .post('/users')
+ *     .execute();
+ * ```
+ */
 export interface IGivenStep {
-  // Configuration methods
+  // =============================================
+  // CONFIGURATION METHODS
+  // =============================================
+  
+  /**
+   * Set the base URL for the API request
+   * 
+   * @param url - The base URL (supports variable templating like {{baseURL}})
+   * @returns The current Given step for method chaining
+   * 
+   * @example
+   * ```typescript
+   * .baseURL('https://api.example.com')
+   * .baseURL('{{API_BASE_URL}}') // Using template variable
+   * .baseURL(process.env.API_BASE_URL || 'https://localhost:3000')
+   * ```
+   */
   baseURL(url: string): IGivenStep;
+
+  /**
+   * Set the request timeout in milliseconds
+   * 
+   * @param ms - Timeout in milliseconds (default: 30000)
+   * @returns The current Given step for method chaining
+   * 
+   * @example
+   * ```typescript
+   * .timeout(5000)  // 5 seconds
+   * .timeout(30000) // 30 seconds (default)
+   * ```
+   */
   timeout(ms: number): IGivenStep;
+
+  /**
+   * Use a specific named HTTP client
+   * 
+   * @param clientName - Name of the client to use (must be created first)
+   * @returns The current Given step for method chaining
+   * 
+   * @example
+   * ```typescript
+   * // First create the client
+   * restified.createClient('authService', { baseURL: 'https://auth.example.com' });
+   * 
+   * // Then use it
+   * .client('authService')
+   * ```
+   */
   client(clientName: string): IGivenStep;
   
-  // Header methods
+  // =============================================
+  // HEADER METHODS
+  // =============================================
+
+  /**
+   * Set a single HTTP header
+   * 
+   * @param name - Header name (case-insensitive)
+   * @param value - Header value (supports variable templating)
+   * @returns The current Given step for method chaining
+   * 
+   * @example
+   * ```typescript
+   * .header('Content-Type', 'application/json')
+   * .header('Authorization', 'Bearer {{authToken}}')
+   * .header('X-Request-ID', '{{$random.uuid}}')
+   * ```
+   */
   header(name: string, value: string): IGivenStep;
+
+  /**
+   * Set multiple HTTP headers at once
+   * 
+   * @param headers - Object containing header name-value pairs
+   * @returns The current Given step for method chaining
+   * 
+   * @example
+   * ```typescript
+   * .headers({
+   *   'Content-Type': 'application/json',
+   *   'Authorization': 'Bearer {{token}}',
+   *   'X-API-Key': '{{apiKey}}'
+   * })
+   * ```
+   */
   headers(headers: Record<string, string>): IGivenStep;
+
+  /**
+   * Set the Content-Type header
+   * 
+   * @param contentType - MIME type for the request body
+   * @returns The current Given step for method chaining
+   * 
+   * @example
+   * ```typescript
+   * .contentType('application/json')
+   * .contentType('application/xml')
+   * .contentType('multipart/form-data')
+   * ```
+   */
   contentType(contentType: string): IGivenStep;
+
+  /**
+   * Set the Accept header
+   * 
+   * @param accept - MIME type(s) the client accepts
+   * @returns The current Given step for method chaining
+   * 
+   * @example
+   * ```typescript
+   * .accept('application/json')
+   * .accept('application/xml')
+   * .accept('text/plain, application/json')
+   * ```
+   */
   accept(accept: string): IGivenStep;
+
+  /**
+   * Set the User-Agent header
+   * 
+   * @param userAgent - User agent string
+   * @returns The current Given step for method chaining
+   * 
+   * @example
+   * ```typescript
+   * .userAgent('RestifiedTS/1.0.0')
+   * .userAgent('MyApp/2.1.0 (RestifiedTS)')
+   * ```
+   */
   userAgent(userAgent: string): IGivenStep;
   
-  // Authentication methods
+  // =============================================
+  // AUTHENTICATION METHODS
+  // =============================================
+
+  /**
+   * Set authentication configuration
+   * 
+   * @param auth - Authentication configuration object
+   * @returns The current Given step for method chaining
+   * 
+   * @example
+   * ```typescript
+   * .auth({ type: 'bearer', token: 'your-token' })
+   * .auth({ type: 'basic', username: 'user', password: 'pass' })
+   * ```
+   */
   auth(auth: RestifiedConfig['auth']): IGivenStep;
+
+  /**
+   * Set Basic Authentication
+   * 
+   * @param username - Username for basic auth
+   * @param password - Password for basic auth
+   * @returns The current Given step for method chaining
+   * 
+   * @example
+   * ```typescript
+   * .basicAuth('admin', 'password123')
+   * .basicAuth('{{username}}', '{{password}}')
+   * ```
+   */
   basicAuth(username: string, password: string): IGivenStep;
+
+  /**
+   * Set Bearer Token Authentication
+   * 
+   * @param token - JWT or other bearer token (supports variable templating)
+   * @returns The current Given step for method chaining
+   * 
+   * @example
+   * ```typescript
+   * .bearerToken('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...')
+   * .bearerToken('{{authToken}}')
+   * .bearerToken(process.env.AUTH_TOKEN!)
+   * ```
+   */
   bearerToken(token: string): IGivenStep;
+
+  /**
+   * Set API Key Authentication
+   * 
+   * @param key - API key value (supports variable templating)
+   * @param headerName - Header name for the API key (default: 'X-API-Key')
+   * @returns The current Given step for method chaining
+   * 
+   * @example
+   * ```typescript
+   * .apiKey('sk_test_1234567890')
+   * .apiKey('{{apiKey}}', 'X-Custom-API-Key')
+   * .apiKey(process.env.API_KEY!, 'Authorization')
+   * ```
+   */
   apiKey(key: string, headerName?: string): IGivenStep;
   
   // Body methods
@@ -558,6 +754,7 @@ export interface GraphQLConfig {
   headers?: Record<string, string>;
   introspection?: boolean;
   defaultVariables?: Record<string, any>;
+  httpClient?: any; // HttpClient type - avoid circular dependency
 }
 
 // ==========================================
@@ -859,6 +1056,21 @@ export interface TrendData {
 }
 
 export type TrendDirection = 'increasing' | 'decreasing' | 'stable';
+
+// ==========================================
+// CLIENT MANAGEMENT TYPES
+// ==========================================
+
+export type ClientType = 'http' | 'graphql' | 'websocket';
+
+export interface ClientInfo {
+  name: string;
+  type: ClientType;
+  active: boolean;
+  createdAt: Date;
+  lastUsed?: Date;
+  requestCount: number;
+}
 
 // ==========================================
 // EXPORT TYPES

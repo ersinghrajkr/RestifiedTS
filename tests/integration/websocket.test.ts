@@ -3,6 +3,33 @@ import { restified } from '../../src';
 
 describe('WebSocket Integration Tests @integration @smoke', () => {
   
+  // Clean up WebSocket connections after each test
+  afterEach(async () => {
+    try {
+      // Disconnect all WebSocket connections to prevent hanging connections with timeout
+      await Promise.race([
+        restified.disconnectAllWebSockets(),
+        new Promise<void>((_, reject) => 
+          setTimeout(() => reject(new Error('WebSocket cleanup timeout')), 1000)
+        )
+      ]);
+    } catch (error) {
+      // Ignore cleanup errors
+      console.debug('WebSocket cleanup error (ignored):', (error as Error).message);
+    }
+  });
+
+  // Clean up after all tests
+  after(async () => {
+    try {
+      // Final cleanup to ensure all connections are closed
+      await restified.disconnectAllWebSockets();
+    } catch (error) {
+      // Ignore cleanup errors
+      console.debug('Final WebSocket cleanup error (ignored):', (error as Error).message);
+    }
+  });
+  
   describe('WebSocket Connection Management', () => {
     it('should add WebSocket connections', async function() {
       try {
@@ -11,14 +38,16 @@ describe('WebSocket Integration Tests @integration @smoke', () => {
           name: 'echo-server',
           url: 'wss://echo.websocket.org',
           protocols: ['echo-protocol'],
-          timeout: 5000
+          timeout: 5000,
+          maxReconnectAttempts: 0 // Disable auto-reconnect in tests
         });
 
         restified.addWebSocketConnection({
           name: 'test-server',
           url: 'wss://echo.websocket.org',
           protocols: [],
-          timeout: 3000
+          timeout: 3000,
+          maxReconnectAttempts: 0 // Disable auto-reconnect in tests
         });
 
         // If we get here without throwing, the method works
@@ -36,7 +65,8 @@ describe('WebSocket Integration Tests @integration @smoke', () => {
           name: 'active-test',
           url: 'wss://echo.websocket.org',
           protocols: [],
-          timeout: 5000
+          timeout: 5000,
+          maxReconnectAttempts: 0 // Disable auto-reconnect in tests
         });
 
         restified.setActiveWebSocketConnection('active-test');
@@ -58,7 +88,8 @@ describe('WebSocket Integration Tests @integration @smoke', () => {
           name: 'temp-connection',
           url: 'wss://echo.websocket.org',
           protocols: [],
-          timeout: 5000
+          timeout: 5000,
+          maxReconnectAttempts: 0 // Disable auto-reconnect in tests
         });
 
         await restified.removeWebSocketConnection('temp-connection');
@@ -106,7 +137,8 @@ describe('WebSocket Integration Tests @integration @smoke', () => {
           name: 'echo-test',
           url: 'wss://echo.websocket.org',
           protocols: ['echo-protocol'],
-          timeout: 5000
+          timeout: 5000,
+          maxReconnectAttempts: 0 // Disable auto-reconnect in tests
         });
 
         // Try to connect using the DSL
@@ -138,7 +170,8 @@ describe('WebSocket Integration Tests @integration @smoke', () => {
           name: 'connect-test',
           url: 'wss://echo.websocket.org',
           protocols: [],
-          timeout: 8000
+          timeout: 8000,
+          maxReconnectAttempts: 0 // Disable auto-reconnect in tests
         });
 
         // Try to connect
@@ -162,7 +195,8 @@ describe('WebSocket Integration Tests @integration @smoke', () => {
           name: 'text-test',
           url: 'wss://echo.websocket.org',
           protocols: [],
-          timeout: 8000
+          timeout: 8000,
+          maxReconnectAttempts: 0 // Disable auto-reconnect in tests
         });
 
         await restified.connectWebSocket('text-test');
@@ -189,7 +223,8 @@ describe('WebSocket Integration Tests @integration @smoke', () => {
           name: 'json-test',
           url: 'wss://echo.websocket.org',
           protocols: [],
-          timeout: 8000
+          timeout: 8000,
+          maxReconnectAttempts: 0 // Disable auto-reconnect in tests
         });
 
         await restified.connectWebSocket('json-test');
@@ -221,7 +256,8 @@ describe('WebSocket Integration Tests @integration @smoke', () => {
           name: 'binary-test',
           url: 'wss://echo.websocket.org',
           protocols: [],
-          timeout: 8000
+          timeout: 8000,
+          maxReconnectAttempts: 0 // Disable auto-reconnect in tests
         });
 
         await restified.connectWebSocket('binary-test');
@@ -248,7 +284,8 @@ describe('WebSocket Integration Tests @integration @smoke', () => {
           name: 'wait-test',
           url: 'wss://echo.websocket.org',
           protocols: [],
-          timeout: 10000
+          timeout: 10000,
+          maxReconnectAttempts: 0 // Disable auto-reconnect in tests
         });
 
         await restified.connectWebSocket('wait-test');
@@ -280,7 +317,8 @@ describe('WebSocket Integration Tests @integration @smoke', () => {
           name: 'disconnect-test',
           url: 'wss://echo.websocket.org',
           protocols: [],
-          timeout: 8000
+          timeout: 8000,
+          maxReconnectAttempts: 0 // Disable auto-reconnect in tests
         });
 
         await restified.connectWebSocket('disconnect-test');
@@ -308,14 +346,16 @@ describe('WebSocket Integration Tests @integration @smoke', () => {
           name: 'broadcast-1',
           url: 'wss://echo.websocket.org',
           protocols: [],
-          timeout: 8000
+          timeout: 8000,
+          maxReconnectAttempts: 0 // Disable auto-reconnect in tests
         });
 
         restified.addWebSocketConnection({
           name: 'broadcast-2', 
           url: 'wss://echo.websocket.org',
           protocols: [],
-          timeout: 8000
+          timeout: 8000,
+          maxReconnectAttempts: 0 // Disable auto-reconnect in tests
         });
 
         // Connect to all
@@ -343,14 +383,16 @@ describe('WebSocket Integration Tests @integration @smoke', () => {
           name: 'connect-all-1',
           url: 'wss://echo.websocket.org',
           protocols: [],
-          timeout: 8000
+          timeout: 8000,
+          maxReconnectAttempts: 0 // Disable auto-reconnect in tests
         });
 
         restified.addWebSocketConnection({
           name: 'connect-all-2',
           url: 'wss://echo.websocket.org',
           protocols: [],
-          timeout: 8000
+          timeout: 8000,
+          maxReconnectAttempts: 0 // Disable auto-reconnect in tests
         });
 
         // Connect to all
@@ -374,14 +416,16 @@ describe('WebSocket Integration Tests @integration @smoke', () => {
           name: 'disconnect-all-1',
           url: 'wss://echo.websocket.org',
           protocols: [],
-          timeout: 8000
+          timeout: 8000,
+          maxReconnectAttempts: 0 // Disable auto-reconnect in tests
         });
 
         restified.addWebSocketConnection({
           name: 'disconnect-all-2',
           url: 'wss://echo.websocket.org',
           protocols: [],
-          timeout: 8000
+          timeout: 8000,
+          maxReconnectAttempts: 0 // Disable auto-reconnect in tests
         });
 
         await restified.connectAllWebSockets();
@@ -426,7 +470,8 @@ describe('WebSocket Integration Tests @integration @smoke', () => {
           name: 'manager-test',
           url: 'wss://echo.websocket.org',
           protocols: [],
-          timeout: 8000
+          timeout: 8000,
+          maxReconnectAttempts: 0 // Disable auto-reconnect in tests
         });
 
         // Connect through manager
@@ -457,7 +502,8 @@ describe('WebSocket Integration Tests @integration @smoke', () => {
           name: 'invalid-url-test',
           url: 'wss://non-existent-websocket.invalid',
           protocols: [],
-          timeout: 3000
+          timeout: 3000,
+          maxReconnectAttempts: 0 // Disable auto-reconnect in tests
         });
 
         await restified.connectWebSocket('invalid-url-test');

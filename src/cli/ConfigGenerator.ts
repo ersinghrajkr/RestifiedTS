@@ -58,7 +58,7 @@ export class ConfigGenerator {
       },
       "reporting": {
         "formats": ["html", "json"],
-        "directory": "reports",
+        "directory": "output/reports",
         "includeSnapshots": true,
         "includeDiffs": true
       },
@@ -155,7 +155,7 @@ export class ConfigGenerator {
           },
           "reporting": {
             "formats": ["html", "json"],
-            "directory": "reports/staging"
+            "directory": "output/reports"
           }
         };
         break;
@@ -191,7 +191,7 @@ export class ConfigGenerator {
           },
           "reporting": {
             "formats": ["json"],
-            "directory": "reports/production",
+            "directory": "output/reports",
             "includeSnapshots": false
           },
           "graphql": {
@@ -222,7 +222,7 @@ export class ConfigGenerator {
           },
           "reporting": {
             "formats": ["json"],
-            "directory": "reports/test"
+            "directory": "output/reports"
           }
         };
         break;
@@ -244,7 +244,7 @@ export class ConfigGenerator {
             "level": "info"
           },
           "reporting": {
-            "directory": `reports/${environment}`
+            "directory": "output/reports"
           }
         };
         break;
@@ -372,7 +372,7 @@ ${upperEnv}_PARALLEL_TESTS=false
       },
       "reporting": {
         "formats": ["html", "json", "xml"],
-        "directory": "reports",
+        "directory": "output/reports",
         "includeSnapshots": true,
         "includeDiffs": true,
         "generateSummary": true,

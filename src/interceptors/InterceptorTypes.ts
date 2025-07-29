@@ -143,17 +143,18 @@ export interface InterceptorChainResult {
 export interface RestifiedPlugin {
   name: string;
   version: string;
-  description: string;
+  description?: string;
   author?: string;
   dependencies?: string[];
-  enabled: boolean;
-  priority: InterceptorPriority;
+  enabled?: boolean;
+  priority?: InterceptorPriority;
   
   // Plugin lifecycle hooks
   initialize?: (context: PluginContext) => Promise<void> | void;
   configure?: (config: any) => Promise<void> | void;
   activate?: () => Promise<void> | void;
   deactivate?: () => Promise<void> | void;
+  cleanup?: () => Promise<void> | void;
   destroy?: () => Promise<void> | void;
   
   // Interceptors provided by the plugin
@@ -191,6 +192,7 @@ export interface PluginServices {
   assertionManager: any;
   logger: any;
   config: any;
+  registerInterceptor?: (interceptor: any) => void;
 }
 
 /**
