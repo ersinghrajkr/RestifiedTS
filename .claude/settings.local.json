@@ -32,7 +32,8 @@
       "Bash(npm run lint)",
       "mcp__ide__getDiagnostics",
       "Bash(sed:*)",
-      "Bash(rg:*)"
+      "Bash(rg:*)",
+      "WebFetch(domain:playwright.dev)"
     ],
     "deny": []
   }

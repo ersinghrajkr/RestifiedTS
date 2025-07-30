@@ -178,7 +178,7 @@ export class ArtilleryIntegration extends EventEmitter {
       auth?: any;
     }>;
     authentication?: {
-      type: 'bearer' | 'basic' | 'apikey';
+      type: 'bearer' | 'basic' | 'oauth2';
       credentials: any;
     };
   }): ArtilleryConfig {

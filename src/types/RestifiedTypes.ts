@@ -12,7 +12,69 @@ import { IncomingHttpHeaders } from 'http';
 // CORE CONFIGURATION TYPES
 // ==========================================
 
-export interface RestifiedConfig {
+// New Playwright-style configuration extensions
+export interface PlaywrightStyleConfig {
+  // Test Discovery (Playwright-style)
+  testDir?: string;
+  testMatch?: string | string[];
+  testIgnore?: string | string[];
+  
+  // Execution Settings (Playwright-style)
+  fullyParallel?: boolean;
+  workers?: number | string;
+  forbidOnly?: boolean;
+  
+  // Global Setup/Teardown (Playwright-style)
+  globalSetup?: string;
+  globalTeardown?: string;
+  
+  // Multi-project support (Playwright-style)
+  projects?: ProjectConfig[];
+  
+  // Reporting (Playwright-style)
+  reporter?: string | ReporterConfig | (string | ReporterConfig)[];
+  
+  // Enterprise extensions
+  enterprise?: EnterpriseConfigExtended;
+}
+
+export interface ProjectConfig {
+  name: string;
+  baseURL?: string;
+  testMatch?: string | string[];
+  testIgnore?: string | string[];
+  timeout?: number;
+  retries?: number;
+  headers?: Record<string, string>;
+  auth?: RestifiedConfig['auth'];
+  environment?: string;
+}
+
+export interface ReporterConfig {
+  type: 'html' | 'json' | 'junit' | 'console' | 'github' | 'list';
+  options?: {
+    outputFile?: string;
+    outputFolder?: string;
+    open?: boolean;
+    inline?: boolean;
+  };
+}
+
+export interface EnterpriseConfigExtended {
+  roles?: string[];
+  dataGeneration?: boolean;
+  boundaryTesting?: boolean;
+  performanceTracking?: boolean;
+  securityTesting?: boolean;
+  loadBalancing?: 'round-robin' | 'random' | 'least-connections';
+  circuitBreaker?: {
+    enabled: boolean;
+    failureThreshold: number;
+    resetTimeout: number;
+  };
+}
+
+export interface RestifiedConfig extends PlaywrightStyleConfig {
   // Base configuration
   baseURL?: string;
   timeout?: number;

@@ -6,24 +6,46 @@
 
 **RestifiedTS** is a production-grade API testing framework built in TypeScript, inspired by Java's RestAssured. Test REST APIs, GraphQL endpoints, and WebSocket connections with a fluent DSL, comprehensive features, and extensive reporting capabilities.
 
-> **🎉 NEW in v1.2.5:** **Zero-Configuration Mochawesome Integration!** RestifiedTS now automatically detects Mocha environments and attaches HTTP request/response data to test reports without any setup required!
+> **🎉 NEW in v1.3.0:** **Playwright-Style Configuration + K6 TypeScript Integration!** RestifiedTS now includes advanced configuration management similar to Playwright and native K6 TypeScript performance testing - the most comprehensive API testing solution!
 
 ## ✨ Key Features
 
-✅ **Fluent DSL** - Clean `given().when().then()` syntax
-✅ **TypeScript First** - Full type safety and IntelliSense support
-✅ **Multi-Protocol** - REST, GraphQL, and WebSocket testing
-✅ **Database Integration** - Test API with database state validation
-✅ **Performance Testing** - Artillery integration for load testing
-✅ **Security Testing** - OWASP ZAP integration for vulnerability scanning
-✅ **Test Orchestration** - Unified API + Performance + Security testing
-✅ **Multi-Client Architecture** - Test multiple services in one suite
-✅ **Variable Resolution** - Dynamic payloads with Faker.js integration
-✅ **Authentication Support** - Bearer, Basic, API Key, OAuth2
-✅ **Advanced Schema Validation** - Joi, Zod, AJV multi-validator support
-✅ **Zero-Config Mochawesome Integration** - Automatic request/response context attachment
-✅ **Comprehensive Test Analytics** - Performance metrics, error tracking, and execution flow
-✅ **CLI Tools** - Generate advanced test templates and project scaffolding
+### 🔧 **NEW: Playwright-Style Configuration**
+✅ **`restified.config.ts`** - Centralized configuration like Playwright  
+✅ **Multi-Project Support** - Test multiple services with different configs  
+✅ **Environment-Aware** - Automatic CI/local settings detection  
+✅ **Interactive Setup** - `restifiedts config-init` command  
+
+### 🚀 **NEW: K6 TypeScript Performance Testing**
+✅ **Native TypeScript Support** - Generate typed K6 scripts from RestifiedTS tests  
+✅ **Unified Performance Engine** - Auto-select K6 or Artillery based on availability  
+✅ **Faker Integration** - Realistic test data generation similar to xk6-faker  
+✅ **Multi-Locale Support** - International testing with 50+ locales  
+✅ **Modern Load Testing** - Smoke, Load, Stress, Spike, Soak scenarios  
+✅ **Zero Configuration** - Direct `.ts` file execution with K6 v0.52+  
+
+### 🎯 **Core Framework Features**
+✅ **Fluent DSL** - Clean `given().when().then()` syntax  
+✅ **TypeScript First** - Full type safety and IntelliSense support  
+✅ **Multi-Protocol** - REST, GraphQL, and WebSocket testing  
+✅ **Database Integration** - Test API with database state validation  
+✅ **Dual Performance Engines** - K6 TypeScript + Artillery integration  
+✅ **Security Testing** - OWASP ZAP integration for vulnerability scanning  
+✅ **Test Orchestration** - Unified API + Performance + Security testing  
+✅ **Multi-Client Architecture** - Test multiple services in one suite  
+✅ **Variable Resolution** - Dynamic payloads with Faker.js integration  
+✅ **Authentication Support** - Bearer, Basic, API Key, OAuth2  
+✅ **Advanced Schema Validation** - Joi, Zod, AJV multi-validator support  
+✅ **Zero-Config Mochawesome Integration** - Automatic request/response context attachment  
+✅ **Comprehensive Test Analytics** - Performance metrics, error tracking, and execution flow  
+
+### 🛠️ **Advanced Tooling**
+✅ **Enhanced CLI Tools** - 13+ test template generators and project scaffolding  
+✅ **Enterprise Features** - Multi-service, multi-role testing with parallel execution  
+✅ **Role-Based Testing** - Define user roles with permissions for comprehensive access control testing  
+✅ **Endpoint Discovery** - Auto-discover endpoints from OpenAPI/Swagger specifications  
+✅ **Batch Test Orchestration** - Execute thousands of tests across services and roles in parallel  
+✅ **Parallel Test Execution** - Configure folder-based parallel/sequential test execution
 
 ## 🚀 Quick Start
 
@@ -36,6 +58,174 @@ npm install --save-dev mocha chai @types/mocha @types/chai @types/node typescrip
 # Optional: For enhanced HTML reports with automatic context attachment
 npm install --save-dev mochawesome mochawesome-report-generator mochawesome-merge
 ```
+
+## 🔧 **NEW: Playwright-Style Configuration**
+
+RestifiedTS v1.3.0 introduces advanced configuration management similar to Playwright, making it perfect for modern development workflows.
+
+### Generate Playwright-Style Config
+
+```bash
+# Interactive configuration generator
+npx restifiedts config-init
+
+# Generate specific config type
+npx restifiedts config-init --type enterprise
+```
+
+### Create `restified.config.ts`
+
+```typescript
+import { defineConfig } from 'restifiedts';
+
+export default defineConfig({
+  // Test Discovery
+  testDir: './tests',
+  testMatch: ['**/*.test.ts', '**/*.spec.ts'],
+  
+  // Execution Settings
+  fullyParallel: true,
+  workers: process.env.CI ? 4 : '50%',
+  timeout: 30000,
+  retries: process.env.CI ? 2 : 0,
+  
+  // Multiple Service Projects
+  projects: [
+    {
+      name: 'user-service',
+      baseURL: process.env.USER_SERVICE_URL || 'https://api.example.com/users',
+      auth: { type: 'bearer', token: process.env.USER_TOKEN }
+    },
+    {
+      name: 'auth-service',
+      baseURL: process.env.AUTH_SERVICE_URL || 'https://auth.example.com',
+      auth: { type: 'oauth2', clientId: process.env.AUTH_CLIENT_ID }
+    }
+  ],
+  
+  // Enterprise Features
+  enterprise: {
+    roles: ['admin', 'manager', 'user'],
+    dataGeneration: true,
+    performanceTracking: true
+  },
+  
+  // Performance Testing with K6
+  performance: {
+    engine: 'k6', // or 'artillery' or 'auto'
+    thresholds: {
+      responseTime: 2000,
+      errorRate: 0.01,
+      throughput: 10
+    }
+  }
+});
+```
+
+### Use Configuration-Aware Testing
+
+```typescript
+// Automatically loads restified.config.ts
+const restified = await RestifiedTS.create();
+
+// Switch between configured projects
+restified.useClient('user-service');
+restified.useClient('auth-service');
+
+// Run performance tests with configured engine
+const performanceEngine = new PerformanceEngine();
+await performanceEngine.runPerformanceTest({
+  name: 'Load Test',
+  engine: 'auto', // Uses config or auto-detects K6/Artillery
+  scenarios: { load: true }
+});
+```
+
+## 🚀 **NEW: K6 TypeScript Performance Testing**
+
+RestifiedTS now includes native K6 TypeScript support - the most advanced performance testing integration available.
+
+### Auto-Generate K6 TypeScript Scripts
+
+```typescript
+import { K6Integration } from 'restifiedts';
+
+const k6 = new K6Integration();
+
+// Convert RestifiedTS test to typed K6 script
+const k6Script = k6.convertRestifiedTestToK6TypeScript({
+  name: 'User API Performance Test',
+  baseUrl: 'https://api.example.com',
+  endpoints: [
+    { path: '/users', method: 'GET', expectedStatus: 200 },
+    { path: '/users', method: 'POST', body: { name: 'Test User' } }
+  ],
+  authentication: {
+    type: 'bearer',
+    credentials: { username: 'admin', password: 'admin123' }
+  }
+});
+
+// Run TypeScript K6 test (requires K6 v0.52+)
+const testId = await k6.runK6Test(k6Script, {
+  scenarios: {
+    load_test: {
+      executor: 'ramping-vus',
+      stages: [
+        { duration: '1m', target: 10 },
+        { duration: '2m', target: 20 },
+        { duration: '1m', target: 0 }
+      ]
+    }
+  },
+  thresholds: {
+    http_req_duration: [{ threshold: 'p(95)<2000' }],
+    http_req_failed: [{ threshold: 'rate<0.01' }]
+  }
+}, { useTypeScript: true });
+```
+
+### Unified Performance Engine
+
+```typescript
+// Auto-selects best available engine (K6 → Artillery)
+const performanceEngine = new PerformanceEngine();
+
+const testResult = await performanceEngine.runPerformanceTest({
+  name: 'Multi-Engine Test',
+  engine: 'auto', // K6 if available, Artillery fallback
+  baseUrl: 'https://api.example.com',
+  endpoints: [
+    { path: '/users', method: 'GET' },
+    { path: '/posts', method: 'GET' }
+  ],
+  scenarios: {
+    smoke: true,  // Quick validation
+    load: true,   // Normal load
+    stress: true  // Beyond capacity
+  },
+  thresholds: {
+    responseTime: 1000,
+    errorRate: 0.005,
+    throughput: 25
+  }
+});
+
+// Get comprehensive performance analysis
+const report = await performanceEngine.generateUnifiedReport(testResult);
+console.log(`Performance Score: ${report.analysis.performanceScore}/100`);
+console.log(`Bottlenecks: ${report.analysis.bottlenecks.join(', ')}`);
+```
+
+### K6 Features Available
+
+✅ **Native TypeScript** - Direct `.ts` execution with `--compatibility-mode=experimental_enhanced`  
+✅ **Modern ES6+** - Optional chaining, object spread, private fields  
+✅ **Type Safety** - Interfaces, generics, and compile-time checking  
+✅ **5 Test Scenarios** - Smoke, Load, Stress, Spike, Soak  
+✅ **Advanced Metrics** - Custom counters, trends, rates with typing  
+✅ **Cloud Ready** - Grafana Cloud K6 integration  
+✅ **Zero Build Step** - No webpack, babel, or bundling required  
 
 ### Your First Test
 
@@ -491,9 +681,36 @@ it('should create user with dynamic data', async function() {
 });
 ```
 
-## 🛠️ CLI Tools & Project Management
+## 🛠️ Enhanced CLI Tools & Project Management
 
-### Initialize a New RestifiedTS Project
+RestifiedTS CLI provides comprehensive project scaffolding and test generation with 12+ templates and advanced configuration management.
+
+### New Project Generation
+
+```bash
+# 🆕 Generate complete RestifiedTS project with interactive setup
+npx restifiedts new
+
+# Choose from: Basic, Enterprise (multi-service), Microservices (large-scale)
+# Includes: Package.json, TypeScript config, test structure, environment setup
+```
+
+### Configuration Management
+
+```bash
+# 🆕 Generate Playwright-style configuration
+npx restifiedts config-init
+
+# Generate specific configuration type
+npx restifiedts config-init --type basic
+npx restifiedts config-init --type enterprise  
+npx restifiedts config-init --type microservices
+
+# Specify output directory
+npx restifiedts config-init --output ./custom-config
+```
+
+### Initialize Existing Project
 
 ```bash
 # Initialize RestifiedTS in current directory
@@ -503,43 +720,34 @@ npx restifiedts init
 npx restifiedts init --force
 ```
 
-### Generate Test Files
+### Generate Test Files (12+ Templates)
 
-The CLI supports these test types:
+The CLI supports these comprehensive test types:
 
 ```bash
-# Basic API test
-npx restifiedts generate --type api --name UserAPI
+# 🆕 Complete list of available templates
+npx restifiedts templates
 
-# Authentication test
+# Basic Templates
+npx restifiedts generate --type api --name UserAPI
+npx restifiedts generate --type crud --name UserCRUD
 npx restifiedts generate --type auth --name LoginAuth
 
-# Multi-client integration test
+# Advanced Integration Templates  
 npx restifiedts generate --type multi-client --name ServiceIntegration
-
-# Database integration test
 npx restifiedts generate --type database --name UserDatabase
-
-# Performance test
-npx restifiedts generate --type performance --name LoadTest
-
-# GraphQL test
 npx restifiedts generate --type graphql --name GraphQLQueries
-
-# WebSocket test
 npx restifiedts generate --type websocket --name RealtimeEvents
 
-# Security test
+# Performance & Security Templates
+npx restifiedts generate --type performance --name LoadTest
 npx restifiedts generate --type security --name SecurityScan
 
-# Comprehensive test (all features)
-npx restifiedts generate --type comprehensive --name FullStackTest
-
-# Schema validation test
-npx restifiedts generate --type validation --name SchemaValidation
-
-# Unified test (API + Performance + Security)
+# Enterprise Templates
 npx restifiedts generate --type unified --name UnifiedTest
+npx restifiedts generate --type validation --name SchemaValidation
+npx restifiedts generate --type comprehensive --name FullStackTest
+npx restifiedts generate --type setup --name GlobalSetup
 ```
 
 ### Advanced CLI Options
@@ -558,6 +766,202 @@ npx restifiedts generate --type api --name UserAPI --suite
 npx restifiedts scaffold --service UserService --baseURL https://api.example.com
 npx restifiedts scaffold --service UserService --include-graphql --include-websocket
 ```
+
+## 🎭 Faker-Powered Performance Testing
+
+**NEW:** RestifiedTS now includes comprehensive faker integration that **follows the exact same pattern as [xk6-faker](https://github.com/grafana/xk6-faker)**, but with native TypeScript support and no binary extension required!
+
+### 🔥 **xk6-faker Compatible Pattern**
+
+RestifiedTS generates K6 scripts that work **exactly like xk6-faker** by making `faker` globally available:
+
+```typescript
+// Generated by RestifiedTS (same as xk6-faker!)
+import { faker } from '@faker-js/faker';
+globalThis.faker = faker;
+
+export default function() {
+  // Use faker directly, just like xk6-faker
+  const user = {
+    firstName: faker.person.firstName(),
+    lastName: faker.person.lastName(),
+    email: faker.internet.email()
+  };
+  
+  http.post('/api/users', JSON.stringify(user));
+}
+```
+
+### 📊 **RestifiedTS vs xk6-faker Comparison**
+
+| Feature | xk6-faker | RestifiedTS Faker |
+|---------|-----------|-------------------|
+| **Setup** | Requires binary compilation | ✅ Zero setup - npm install only |
+| **TypeScript** | ❌ JavaScript only | ✅ Native TypeScript support |
+| **Faker API** | ✅ Global faker object | ✅ Same global faker object |
+| **Pre-built Scenarios** | ❌ Manual coding | ✅ E-commerce, Financial, Social templates |
+| **CLI Generation** | ❌ None | ✅ `restifiedts faker-test` command |
+| **Data Types** | ✅ Basic faker | ✅ Extended with 6 specialized types |
+| **User Journeys** | ❌ Manual | ✅ Multi-step journey generation |
+| **Integration** | K6 extension | ✅ Full framework integration |
+
+### Quick Start with Faker Tests
+
+```bash
+# Generate e-commerce load test with realistic data
+npx restifiedts faker-test -u https://api.mystore.com -t ecommerce --users 50 --duration 5m
+
+# Generate financial services test with German locale
+npx restifiedts faker-test -t financial --locale de --seed 12345 --output financial-test.ts
+
+# Generate social media test with custom parameters
+npx restifiedts faker-test -t social -u https://api.social.com --users 100 --duration 10m
+```
+
+### 🎯 Faker Test Templates
+
+| Template | Description | Scenarios |
+|----------|-------------|-----------|
+| `ecommerce` | E-commerce platform testing | User registration, product browsing, cart operations, checkout |
+| `financial` | Financial services testing | Account creation, transactions, payment processing |
+| `social` | Social media platform testing | User profiles, posts, interactions, messaging |
+| `custom` | Generic API testing | Flexible data generation for any API |
+
+### 🌍 Multi-Locale Support
+
+```bash
+# Test with different locales for international applications
+npx restifiedts faker-test --locale en    # English (default)
+npx restifiedts faker-test --locale de    # German
+npx restifiedts faker-test --locale fr    # French
+npx restifiedts faker-test --locale es    # Spanish
+npx restifiedts faker-test --locale ja    # Japanese
+```
+
+### 🔄 Reproducible Test Data
+
+```bash
+# Use seed for consistent, reproducible test data
+npx restifiedts faker-test --seed 12345
+
+# Same seed = same generated data across test runs
+npx restifiedts faker-test -t ecommerce --seed 98765 --users 20
+```
+
+### 💻 Programmatic Faker Usage
+
+```typescript
+import { K6Integration, K6FakerScenario, PerformanceEngine } from 'restifiedts';
+
+// Create K6 integration with faker
+const k6 = new K6Integration({
+  fakerConfig: {
+    locale: 'en',
+    seed: 12345
+  }
+});
+
+// Define realistic test scenarios
+const scenarios: K6FakerScenario[] = [
+  {
+    name: 'User Registration',
+    endpoint: '/api/users',
+    method: 'POST',
+    dataFields: [
+      { name: 'user', type: 'person' },
+      { name: 'address', type: 'address' }
+    ],
+    validations: [
+      { description: 'user created', check: 'r.status === 201' }
+    ]
+  }
+];
+
+// Generate TypeScript K6 test
+const script = k6.generateK6TestWithFaker(scenarios);
+
+// Run performance test with faker data
+const performanceEngine = new PerformanceEngine();
+const testId = await performanceEngine.runFakerTest({
+  baseUrl: 'https://api.example.com',
+  scenarios,
+  users: 50,
+  duration: '5m'
+});
+```
+
+### 🏪 Pre-built E-commerce Scenario
+
+```typescript
+import { K6Integration } from 'restifiedts';
+
+const k6 = new K6Integration();
+
+// Generate complete e-commerce test suite
+const { script, config } = k6.createEcommerceScenario('https://api.shopify.example.com');
+
+// The generated script includes:
+// ✅ User registration with faker person data
+// ✅ Product browsing and search
+// ✅ Shopping cart operations
+// ✅ Checkout with faker payment data
+// ✅ Realistic user behavior patterns
+```
+
+### 🎭 Available Faker Data Types
+
+| Type | Generated Data | Examples |
+|------|---------------|----------|
+| `person` | User profiles | firstName, lastName, email, phone, avatar |
+| `address` | Location data | street, city, state, zipCode, country |
+| `company` | Business data | name, catchPhrase, bs, ein, industry |
+| `product` | Product info | name, description, price, category, sku |
+| `financial` | Payment data | creditCard, iban, bic, amount, currency |
+| `internet` | Web data | email, url, domain, username, password |
+
+### 🚀 Generated K6 TypeScript Features
+
+The faker integration generates modern K6 TypeScript scripts with:
+
+- ✅ **Type-safe interfaces** for API responses
+- ✅ **Custom metrics** with strong typing
+- ✅ **Modern ES6+ features** (optional chaining, object spread)
+- ✅ **Setup/teardown functions** with proper typing
+- ✅ **Realistic think times** and user behavior
+- ✅ **Comprehensive validations** and assertions
+- ✅ **Error handling** with type safety
+
+### Complete CLI Command Reference
+
+```bash
+# 📋 View all available commands
+npx restifiedts --help
+
+# 🎭 Generate faker-powered performance tests
+npx restifiedts faker-test -u https://api.example.com -t ecommerce --users 50
+npx restifiedts faker-test --template financial --locale de --seed 12345
+npx restifiedts faker-test --template social --output my-social-test.ts
+
+# 📊 Generate comprehensive reports
+npx restifiedts report --comprehensive --performance --security
+
+# ✅ Validate existing test files
+npx restifiedts validate --path tests/
+
+# 🔧 Configuration commands
+npx restifiedts config --environments development,staging,production
+```
+
+**Available Commands:**
+- **`new`** - Generate new RestifiedTS project with interactive setup
+- **`init`** - Initialize RestifiedTS in existing project  
+- **`config-init`** - Generate Playwright-style restified.config.ts
+- **`generate`** - Generate test files from 12+ templates
+- **`scaffold`** - Generate complete service test suite
+- **`config`** - Generate environment configuration files
+- **`templates`** - List all available test templates
+- **`report`** - Generate HTML test reports with multiple formats
+- **`validate`** - Validate existing test files for common issues
 
 ## ⚙️ Configuration Guide
 
@@ -1258,6 +1662,378 @@ npx restifiedts generate --type unified --name ComprehensiveTest --baseURL https
 # Generate schema validation test
 npx restifiedts generate --type validation --name SchemaTest --baseURL https://api.example.com
 ```
+
+## 🏢 Enterprise Features
+
+RestifiedTS provides enterprise-scale multi-service, multi-role testing capabilities for large organizations with complex API ecosystems.
+
+### Role-Based Testing
+
+Define user roles and test access control across all endpoints. **Permissions are optional** since your application controls endpoint access based on roles:
+
+```typescript
+import { restified } from 'restifiedts';
+
+// Define roles - permissions are optional since application controls access
+restified.createRole({
+  name: 'admin',
+  description: 'Administrator role',
+  auth: {
+    type: 'bearer',
+    token: process.env.ADMIN_TOKEN
+  }
+});
+
+restified.createRole({
+  name: 'user',
+  description: 'Standard user role',
+  auth: {
+    type: 'bearer',
+    token: process.env.USER_TOKEN
+  }
+});
+
+restified.createRole({
+  name: 'manager',
+  description: 'Manager role',
+  auth: {
+    type: 'bearer',
+    token: process.env.MANAGER_TOKEN
+  }
+});
+
+// Optional: You can still define permissions if you want to validate against expected behavior
+restified.createRole({
+  name: 'guest',
+  description: 'Guest user with limited access',
+  permissions: ['read.public'], // Optional - for validation purposes only
+  auth: {
+    type: 'bearer',
+    token: process.env.GUEST_TOKEN
+  }
+});
+```
+
+#### 🚀 **New Usage Pattern:**
+
+```typescript
+// BEFORE (Complex permission mapping)
+restified.createRole({
+  name: 'user',
+  permissions: ['read', 'profile.*', 'users.view'], // Complex mapping
+  auth: { type: 'bearer', token: process.env.USER_TOKEN }
+});
+
+// AFTER (Simple role definition)
+restified.createRole({
+  name: 'user',
+  description: 'Standard user role',
+  auth: { type: 'bearer', token: process.env.USER_TOKEN }
+  // No permissions needed - application controls access!
+});
+```
+
+#### 🎯 **Benefits of Application-Controlled Model:**
+
+✅ **Realistic Testing**: Tests actual application behavior, not configuration assumptions  
+✅ **Simplified Setup**: Just define role name and auth - no complex permission mapping  
+✅ **Discovery-Based**: Automatically tests all endpoints with all roles  
+✅ **Real-World Results**: See exactly which roles can access which endpoints  
+✅ **Maintenance-Free**: No need to keep permission configs in sync with application
+
+### Endpoint Discovery
+
+Auto-discover endpoints from OpenAPI/Swagger specifications:
+
+```typescript
+// Discover endpoints from Swagger/OpenAPI specs
+const authServiceEndpoints = await restified.discoverEndpointsFromSwagger(
+  'auth-service', 
+  'https://auth.example.com/swagger.json'
+);
+
+const userServiceEndpoints = await restified.discoverEndpointsFromOpenAPI(
+  'user-service',
+  'https://users.example.com/api-docs'
+);
+
+console.log(`Discovered ${authServiceEndpoints.totalEndpoints} auth endpoints`);
+console.log(`Discovered ${userServiceEndpoints.totalEndpoints} user endpoints`);
+```
+
+### Batch Test Orchestration
+
+Test multiple services with multiple roles in parallel:
+
+```typescript
+// Test all discovered endpoints with all roles
+const batchResult = await restified.testAllEndpointsWithRoles(
+  ['admin', 'user', 'manager'], // roles to test
+  [
+    {
+      serviceName: 'auth-service',
+      specUrl: 'https://auth.example.com/swagger.json'
+    },
+    {
+      serviceName: 'user-service',
+      specUrl: 'https://users.example.com/api-docs'
+    }
+  ]
+);
+
+console.log(`Test Results:`);
+console.log(`- Total Tests: ${batchResult.summary.total}`);
+console.log(`- Passed: ${batchResult.summary.passed}`);
+console.log(`- Failed: ${batchResult.summary.failed}`);
+console.log(`- Pass Rate: ${batchResult.summary.passRate}%`);
+
+// Access control analysis
+console.log(`Access Control Results:`);
+console.log(`- Admin Access Granted: ${batchResult.roleAnalysis.byRole.admin.accessGranted}`);
+console.log(`- User Access Granted: ${batchResult.roleAnalysis.byRole.user.accessGranted}`);
+console.log(`- Manager Access Granted: ${batchResult.roleAnalysis.byRole.manager.accessGranted}`);
+```
+
+**How Application-Controlled Permissions Work:**
+
+1. **Role Definition**: You only define role name and authentication - no complex permission mapping needed
+2. **Application Determines Access**: Your application's middleware/authorization decides if the role can access each endpoint
+3. **RestifiedTS Tests Reality**: Tests what actually happens when each role hits each endpoint
+4. **Results Analysis**: Get detailed reports on which roles can access which endpoints
+
+#### 📊 **Enhanced Results:**
+
+```typescript
+const results = await restified.testAllEndpointsWithRoles(['admin', 'user', 'manager']);
+
+// Clear access control results
+results.results.forEach(result => {
+  if (result.hasAccess) {
+    console.log(`✅ ${result.role} CAN access ${result.method} ${result.endpoint}`);
+  } else {
+    console.log(`❌ ${result.role} CANNOT access ${result.method} ${result.endpoint}`);
+  }
+});
+
+// Role-specific access patterns  
+console.log('Admin endpoints accessed:', results.roleAnalysis.byRole.admin.accessGranted);
+console.log('User endpoints accessed:', results.roleAnalysis.byRole.user.accessGranted);
+```
+
+#### 🧪 **Testing Example:**
+
+```typescript
+// Example: Testing reveals actual application behavior
+describe('Role-Based Access Control', function() {
+  it('should test all endpoints with all roles', async function() {
+    // This tests actual application behavior - not assumptions
+    const results = await restified.testAllEndpointsWithRoles(['admin', 'user', 'manager']);
+    
+    // Verify admin has broader access than user
+    expect(results.roleAnalysis.byRole.admin.accessGranted).to.be.greaterThan(
+      results.roleAnalysis.byRole.user.accessGranted
+    );
+    
+    // Check specific role access patterns
+    const adminResults = results.results.filter(r => r.role === 'admin');
+    const userResults = results.results.filter(r => r.role === 'user');
+    
+    // Admin should have access to admin endpoints
+    const adminEndpoints = adminResults.filter(r => r.endpoint.includes('/admin/'));
+    expect(adminEndpoints.every(r => r.hasAccess)).to.be.true;
+    
+    // User should be denied admin endpoints
+    const userAdminAttempts = userResults.filter(r => r.endpoint.includes('/admin/'));
+    expect(userAdminAttempts.every(r => !r.hasAccess)).to.be.true;
+  });
+});
+```
+
+### Parallel Test Execution
+
+Configure folder-based parallel/sequential test execution:
+
+```typescript
+// Configure parallel execution
+restified.configureParallelExecution({
+  workerCount: 8,
+  sequentialFolders: [
+    'tests/integration',    // Run integration tests sequentially
+    'tests/e2e',           // Run e2e tests sequentially
+    'tests/database'       // Database tests need sequential execution
+  ],
+  parallelFolders: [
+    'tests/unit',          // Unit tests can run in parallel
+    'tests/api',           // API tests can run in parallel
+    'tests/performance'    // Performance tests can run in parallel
+  ],
+  customFolders: {
+    'tests/security': {
+      pattern: '**/*.security.{test,spec}.{js,ts}',
+      execution: 'sequential',
+      priority: 10  // High priority, run first
+    },
+    'tests/load': {
+      pattern: '**/*.load.{test,spec}.{js,ts}',
+      execution: 'parallel',
+      priority: 1   // Low priority, run last
+    }
+  }
+});
+
+// Execute tests with folder-based parallelism
+const testResults = await restified.executeTestFolders(
+  './tests',
+  {
+    timeout: 60000,
+    retries: 2,
+    continueOnFailure: true
+  },
+  (progress) => {
+    console.log(`Progress: ${progress.progressPercentage}% (${progress.completedTasks}/${progress.totalTasks})`);
+  }
+);
+```
+
+### Enterprise Configuration
+
+Centralized configuration management for large-scale testing:
+
+```typescript
+// Load enterprise configuration from file
+const config = await restified.loadEnterpriseConfig('./config/enterprise.json');
+
+// Configuration automatically applied:
+// - All roles are created
+// - All services are configured as clients
+// - Parallel execution settings applied
+// - Global timeouts and retries set
+```
+
+**Enterprise Configuration Example (`enterprise.json`):**
+
+```json
+{
+  "version": "1.0.0",
+  "metadata": {
+    "name": "Enterprise Test Configuration",
+    "description": "Multi-service API testing configuration"
+  },
+  
+  "global": {
+    "timeout": 30000,
+    "retries": 2,
+    "continueOnFailure": true,
+    "environment": "staging"
+  },
+
+  "services": {
+    "auth-service": {
+      "name": "auth-service",
+      "baseUrl": "${AUTH_SERVICE_URL||https://auth.example.com}",
+      "discovery": {
+        "enabled": true,
+        "specUrl": "${AUTH_SERVICE_URL||https://auth.example.com}/swagger.json"
+      }
+    },
+    "user-service": {
+      "name": "user-service",
+      "baseUrl": "${USER_SERVICE_URL||https://users.example.com}",
+      "discovery": {
+        "enabled": true,
+        "specUrl": "${USER_SERVICE_URL||https://users.example.com}/api-docs"
+      }
+    }
+  },
+
+  "roles": {
+    "admin": {
+      "name": "admin",
+      "description": "Administrator role",
+      "auth": {
+        "type": "bearer",
+        "token": "${ADMIN_TOKEN}"
+      }
+    },
+    "user": {
+      "name": "user", 
+      "description": "Standard user role",
+      "auth": {
+        "type": "bearer",
+        "token": "${USER_TOKEN}"
+      }
+    },
+    "manager": {
+      "name": "manager",
+      "description": "Manager role", 
+      "auth": {
+        "type": "bearer",
+        "token": "${MANAGER_TOKEN}"
+      }
+    },
+    "guest": {
+      "name": "guest",
+      "description": "Guest user with limited access",
+      "permissions": ["read.public"],
+      "auth": {
+        "type": "bearer", 
+        "token": "${GUEST_TOKEN}"
+      }
+    }
+  },
+
+  "parallel": {
+    "workerCount": 6,
+    "loadBalancing": "round-robin",
+    "testFolders": {
+      "sequential": ["tests/integration", "tests/e2e"],
+      "parallel": ["tests/unit", "tests/api", "tests/performance"]
+    }
+  },
+
+  "batchPresets": {
+    "smoke-test": {
+      "name": "Smoke Test Suite",
+      "services": ["auth-service", "user-service"],
+      "roles": ["admin", "user"],
+      "filters": {
+        "includeTags": ["smoke", "critical"]
+      }
+    },
+    "full-regression": {
+      "name": "Full Regression Suite",
+      "services": ["auth-service", "user-service"],
+      "roles": ["admin", "manager", "user", "guest"]
+    }
+  }
+}
+```
+
+### Environment Variables for Enterprise
+
+```bash
+# Service URLs
+export AUTH_SERVICE_URL=https://auth.example.com
+export USER_SERVICE_URL=https://users.example.com
+
+# Authentication tokens
+export ADMIN_TOKEN=your-admin-token-here
+export MANAGER_TOKEN=your-manager-token-here
+export USER_TOKEN=your-user-token-here
+export GUEST_TOKEN=your-guest-token-here
+
+# Test configuration
+export NODE_ENV=staging
+export PARALLEL_WORKERS=6
+```
+
+### Use Cases
+
+✅ **Large Organizations**: Test 10+ microservices with 100+ endpoints each  
+✅ **Permission Testing**: Verify role-based access control across all APIs  
+✅ **CI/CD Integration**: Parallel execution for faster build pipelines  
+✅ **Compliance**: Comprehensive permission auditing and reporting  
+✅ **Scale Testing**: Handle thousands of test combinations efficiently  
 
 ## 🐛 Troubleshooting
 

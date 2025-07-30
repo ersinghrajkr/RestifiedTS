@@ -5,7 +5,7 @@
  * but built specifically for modern JavaScript/TypeScript environments.
  * 
  * @author Raj Kumar
- * @version 1.0.0
+ * @version 1.3.0
  * @license MIT
  */
 
@@ -20,6 +20,7 @@ try {
 
 // Core DSL exports
 export { RestifiedTS, restified } from './core/dsl/RestifiedTS';
+export { forceCleanup } from './core/dsl/RestifiedTS';
 export { GivenStep } from './core/dsl/GivenStep';
 export { WhenStep } from './core/dsl/WhenStep';
 export { ThenStep } from './core/dsl/ThenStep';
@@ -37,7 +38,7 @@ export {
 } from './core/clients';
 
 // Configuration exports
-export { Config, ConfigLoader, ConfigValidator } from './core/config/Config';
+export { Config, ConfigValidator } from './core/config/Config';
 
 // Storage exports
 export { 
@@ -138,7 +139,6 @@ export {
   TestEnvironment,
   TestAttachment,
   ReportConfig,
-  // ReportGenerator, // Temporarily commented out due to type issues
   ReportOutput,
   DashboardData,
   TestAnalytics,
@@ -159,11 +159,36 @@ export {
   TestGenerator,
   ProjectScaffolder,
   ConfigGenerator,
-  ModernTestGenerator
+  ModernTestGenerator,
+  ProjectGenerator,
+  RestifiedConfigGenerator
 } from './cli/cli';
 
-// Performance testing exports
+// NEW FEATURES - Configuration exports
+export { defineConfig } from './core/config/RestifiedConfig';
+export type { 
+  RestifiedConfig, 
+  RestifiedProject, 
+  ReporterConfig, 
+  EnterpriseConfig 
+} from './core/config/RestifiedConfig';
+
+// NEW FEATURES - Performance testing exports
 export { ArtilleryIntegration } from './performance/ArtilleryIntegration';
+export { K6Integration } from './performance/K6Integration';
+export { PerformanceEngine } from './performance/PerformanceEngine';
+export { 
+  K6FakerIntegration, 
+  K6FakerTemplates 
+} from './performance/K6FakerIntegration';
+export type {
+  K6FakerScenario,
+  K6DataField,
+  K6UserJourney,
+  K6JourneyStep,
+  K6Validation,
+  K6FieldMapping
+} from './performance/K6FakerIntegration';
 
 // Security testing exports
 export { ZapIntegration } from './security/ZapIntegration';
@@ -173,6 +198,26 @@ export { UnifiedTestOrchestrator } from './orchestration/UnifiedTestOrchestrator
 
 // Advanced validation exports
 export { SchemaValidationManager } from './validation/SchemaValidationManager';
+
+// Enterprise features exports
+// export {
+//   RoleManager,
+//   EndpointDiscovery, 
+//   BatchTestOrchestrator,
+//   ParallelTestExecutor,
+//   EnterpriseConfigManager
+// } from './core/enterprise';
+
+// export type {
+//   RoleConfig,
+//   EndpointDefinition,
+//   DiscoveryConfig,
+//   DiscoveryResult,
+//   BatchTestConfig,
+//   BatchTestResult,
+//   EnterpriseTestConfig,
+//   ParallelExecutionConfig
+// } from './core/enterprise';
 
 // Re-export for default
 import { RestifiedTS } from './core/dsl/RestifiedTS';

@@ -46,11 +46,12 @@
   ],
   "exclude": [
     "node_modules",
-    "dist",
+    "dist", 
     "tests",
     "**/*.spec.ts",
     "**/*.test.ts",
-    "**/*.d.ts"
+    "**/*.d.ts",
+    "src/core/runners/ConfigAwareTestRunner.ts"
   ],
   "ts-node": {
     "require": ["tsconfig-paths/register"],
